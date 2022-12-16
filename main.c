@@ -57,6 +57,7 @@ static struct option parameters[] = {
 	{ "max-threshold",		required_argument,	0,	0x109	},
 	{ "min-threshold",		required_argument,	0,	0x10C	},
 	{ "sub-priv",			no_argument,		0,	0x10E	},
+	{ "version",			no_argument,		0,	0x10F	},
 	{ NULL,					0,					0, 	0 		},
 };
 
@@ -66,7 +67,8 @@ static void print_help_exit (const char *name)
 		errorf("name is null\n");
 		exit(NOK);
 	}
-	debugf("\n%s application is used to parse big and complex log files.\nIt extracts necessary data for you to observe changes on them affectively.\n", name);
+	debugf("\n%s - ver: %s\n", name, VERSION);
+	debugf("This application is used to parse big and complex log files.\nIt extracts necessary data for you to observe changes on them affectively.\n");
 
 	debugf("\nparameters;\n");
 	debugf("\t--file-path: used to specify the log file's directory path.\n\t\tThis is MANDATORY field\n");
@@ -332,7 +334,7 @@ out:
 	FCLOSE(parser->fp);
 
 	errorf("\n**********************************************************\n");
-	errorf("TOTAL PROGRESSES LINES: %d\n", parser->line_cnt);
+	errorf("TOTAL PROGRESSED LINES: %d\n", parser->line_cnt);
 	errorf("TOTAL EXTRACTED LINES: %d\n", parser->total_fount_cnt);
 	errorf("TOTAL SHOWED LINES: %d\n", (parser->total_fount_cnt / parser->from));
 	errorf("\n**********************************************************\n");
@@ -381,7 +383,7 @@ static void sigint_handler(__attribute__((unused)) int sig_num)
 	deinit_parser(&parser);
 
 	errorf("\n**********************************************************\n");
-	errorf("TOTAL PROGRESSES LINES: %d\n", parser.line_cnt);
+	errorf("TOTAL PROGRESSED LINES: %d\n", parser.line_cnt);
 	errorf("TOTAL EXTRACTED LINES: %d\n", parser.total_fount_cnt);
 	errorf("TOTAL SHOWED LINES: %d\n", (parser.total_fount_cnt / parser.from));
 	errorf("\n**********************************************************\n");
@@ -493,6 +495,9 @@ int main(int argc, char **argv)
 			case 0x10E:
 				parser.sub_priv = true;
 				break;
+			case 0x10F:
+				debugf("\n%s - ver: %s\n", argv[0], VERSION);
+				return OK;
 			default:
 				debugf("unknown argument\n");
 				return NOK;

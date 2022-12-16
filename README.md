@@ -62,7 +62,7 @@ And the output will be as follows;
 1184862475  
 1184889445  
 **********************************************************  
-TOTAL PROGRESSES LINES: 30  
+TOTAL PROGRESSED LINES: 30
 TOTAL EXTRACTED LINES: 3  
 TOTAL SHOWED LINES: 3  
 **********************************************************
