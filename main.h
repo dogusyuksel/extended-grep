@@ -13,8 +13,7 @@
 
 #define DELIM 		","
 
-#define ONE_LINE_MAX_LEN	(1024 + 1)
-#define BUFF_SIZE			256
+#define ONE_LINE_MAX_LEN	(2048 + 1)
 
 #define debugf(...)		fprintf(stdout, __VA_ARGS__)
 #define errorf(...)		fprintf(stderr, __VA_ARGS__)

@@ -29,8 +29,8 @@ struct parser
 	unsigned int select;
 	unsigned int element_at;
 	unsigned int line_below;
-	unsigned int line_cnt;
-	unsigned int total_fount_cnt;
+	unsigned long line_cnt;
+	unsigned long total_fount_cnt;
 	long max_thres;
 	long min_thres;
 	char *keyword_list;
@@ -74,9 +74,9 @@ static void print_help_exit (const char *name)
 	debugf("\t--file-path: used to specify the log file's directory path.\n\t\tThis is MANDATORY field\n");
 	debugf("\t--keyword-list: used to specify special keywords to pick a line. You can use multiple keywords seperated by comma without empty space.\n\t\tThis is MANDATORY field\n");
 	debugf("\t--seperator: used to specify special character to split the picked line.\n\t\tTAB is used if it is not set\n");
-	debugf("\t--element-at: used to specify which element you want to extract after splitting the line.\n\t\tThis is MANDATORY field\n");
+	debugf("\t--element-at: used to specify which element you want to extract after splitting the line.\n\t\tIf this is not used, then whole line will be filtered.\n");
 	debugf("\t--type-is-numeric: used to specify the extracted element's type is numeric.\n\t\tThis is usefull when the extracted field contains numeric and alphanumeric characters together\n\t\tNo parameter required\n");
-	debugf("\t--line-below: used to select a new line that is number of lines below the picket line before\n\t\tThis is usefull when there is no constant string specifier to pick the line thatwe want to examine\n");
+	debugf("\t--line-below: used to select a new line that is number of lines below the picket line before\n\t\tThis is usefull when there is no constant string specifier to pick the line that we want to examine\n");
 	debugf("\t--add-line-no: used to specify real line no in the log doc in the new generated file\n\t\tNo parameter required\n");
 	debugf("\t--only-show-changes: used to parameter changes, like \"watch\" property\n\t\tNo parameter required\n");
 	debugf("\t--max-threshold: used to filter numeric values\n\t\ttype-is-numeric arg is used by default with this filter\n");
@@ -187,7 +187,8 @@ static int extract_data(struct parser *parser)
 	char command[ONE_LINE_MAX_LEN] = {0};
 	char *rest = NULL;
     char *token;
-	char temp_priv[BUFF_SIZE] = {0};
+	char temp[ONE_LINE_MAX_LEN] = {0};
+	char temp_priv[ONE_LINE_MAX_LEN] = {0};
 	long value_priv = 0;
 
 	memset(temp_priv, 0, sizeof(temp_priv));
@@ -208,8 +209,6 @@ static int extract_data(struct parser *parser)
 
 	while (fgets(buffer, sizeof(buffer) - 1, parser->fp))
 	{
-		char temp[BUFF_SIZE] = {0};
-
 		memset(temp, 0, sizeof(temp));
 
 		++parser->line_cnt;
@@ -230,6 +229,11 @@ static int extract_data(struct parser *parser)
 					++parser->line_cnt;
 				}
 			}
+			if (parser->element_at == UINT_MAX) {
+				token = buffer;
+				element_cnt++;
+				goto skip_seperator;
+			}
 
 			for (token = strtok_r(buffer, parser->seperator, &rest);
 				token != NULL;
@@ -244,6 +248,7 @@ static int extract_data(struct parser *parser)
 				}
 			}
 
+skip_seperator:
 			if (!token) {
 				continue;
 			}
@@ -317,15 +322,16 @@ static int extract_data(struct parser *parser)
 				if (parser->only_show_changes && !strcmp(temp, temp_priv)) {
 					continue;
 				}
+
 				snprintf(temp_priv, sizeof(temp_priv), "%s", temp);
 
 				trim_empty_spaces(temp, sizeof(temp));
 
 				if (parser->add_line_no) {
-					debugf("%s\t%d\n", temp, parser->line_cnt);
-				} else {
-					debugf("%s\n", temp);
+					int len = strlen(temp);
+					snprintf(&temp[len - 1], sizeof(temp) - len, "\t%ld", parser->line_cnt);
 				}
+				debugf("%s\n", temp);
 			}
 		}
 	}
@@ -334,9 +340,9 @@ out:
 	FCLOSE(parser->fp);
 
 	errorf("\n**********************************************************\n");
-	errorf("TOTAL PROGRESSED LINES: %d\n", parser->line_cnt);
-	errorf("TOTAL EXTRACTED LINES: %d\n", parser->total_fount_cnt);
-	errorf("TOTAL SHOWED LINES: %d\n", (parser->total_fount_cnt / parser->from));
+	errorf("TOTAL PROGRESSED LINES: %ld\n", parser->line_cnt);
+	errorf("TOTAL EXTRACTED LINES: %ld\n", parser->total_fount_cnt);
+	errorf("TOTAL SHOWED LINES: %ld\n", (parser->total_fount_cnt / parser->from));
 	errorf("\n**********************************************************\n");
 
 	return OK;
@@ -383,9 +389,9 @@ static void sigint_handler(__attribute__((unused)) int sig_num)
 	deinit_parser(&parser);
 
 	errorf("\n**********************************************************\n");
-	errorf("TOTAL PROGRESSED LINES: %d\n", parser.line_cnt);
-	errorf("TOTAL EXTRACTED LINES: %d\n", parser.total_fount_cnt);
-	errorf("TOTAL SHOWED LINES: %d\n", (parser.total_fount_cnt / parser.from));
+	errorf("TOTAL PROGRESSED LINES: %ld\n", parser.line_cnt);
+	errorf("TOTAL EXTRACTED LINES: %ld\n", parser.total_fount_cnt);
+	errorf("TOTAL SHOWED LINES: %ld\n", (parser.total_fount_cnt / parser.from));
 	errorf("\n**********************************************************\n");
 
 	exit(NOK);
@@ -511,11 +517,6 @@ int main(int argc, char **argv)
 
 	if (!parser.keyword_list) {
 		errorf("keyword_list field is mandatory\n");
-		print_help_exit(argv[0]);
-	}
-
-	if (parser.element_at == UINT_MAX) {
-		errorf("element-at mandatory\n");
 		print_help_exit(argv[0]);
 	}
 
