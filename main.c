@@ -285,9 +285,8 @@ skip_seperator:
 						}
 					}
 
-					if (starting_pos < strlen(token) - 1 && ending_pos > starting_pos) {
+					if (starting_pos <= strlen(token) - 1 && ending_pos >= starting_pos) {
 						token[ending_pos + 1] = '\0';
-
 						value = strtol(&token[starting_pos], &ptr, 10);
 
 						if (ptr && strlen(ptr) > 0) {
@@ -328,10 +327,10 @@ skip_seperator:
 				trim_empty_spaces(temp, sizeof(temp));
 
 				if (parser->add_line_no) {
-					int len = strlen(temp);
-					snprintf(&temp[len - 1], sizeof(temp) - len, "\t%ld", parser->line_cnt);
+					debugf("%s\t%ld\n", temp, parser->line_cnt);
+				} else {
+					debugf("%s\n", temp);
 				}
-				debugf("%s\n", temp);
 			}
 		}
 	}
