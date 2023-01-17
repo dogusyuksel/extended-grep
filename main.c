@@ -9,6 +9,7 @@
 #include <signal.h>
 #include <sys/queue.h>
 #include <limits.h>
+#include <math.h>
 
 #include "main.h"
 
@@ -19,12 +20,18 @@ struct entry
 };
 TAILQ_HEAD(tailq, entry);
 
+struct image_data_entry
+{
+	long data;
+	TAILQ_ENTRY(image_data_entry) entries;
+};
+TAILQ_HEAD(image_data_tailq, image_data_entry);
+
 struct parser
 {
 	bool type_is_numeric;
 	bool add_line_no;
 	bool only_show_changes;
-	bool sub_priv;
 	unsigned int from;
 	unsigned int select;
 	unsigned int element_at;
@@ -35,29 +42,31 @@ struct parser
 	long min_thres;
 	char *keyword_list;
 	char *file_path;
+	char *image_file_path;
 	char seperator[2];
 	FILE *fp;
 	struct tailq keyword_list_tq;
+	struct image_data_tailq image_data_tailq;
 };
 
 static struct parser parser;
 
 static struct option parameters[] = {
-	{ "file-path",			required_argument,	0,	0x0FF	},
-	{ "help",				no_argument,		0,	0x100	},
-	{ "keyword-list",		required_argument,	0,	0x101	},
-	{ "seperator",			required_argument,	0,	0x102	},
-	{ "element-at",			required_argument,	0,	0x103	},
-	{ "type-is-numeric",	no_argument,		0,	0x104	},
-	{ "line-below",			required_argument,	0,	0x106	},
-	{ "select",				required_argument,	0,	0x10A	},
-	{ "from",				required_argument,	0,	0x10B	},
-	{ "add-line-no",		no_argument,		0,	0x107	},
-	{ "only-show-changes",	no_argument,		0,	0x108	},
-	{ "max-threshold",		required_argument,	0,	0x109	},
-	{ "min-threshold",		required_argument,	0,	0x10C	},
-	{ "sub-priv",			no_argument,		0,	0x10E	},
-	{ "version",			no_argument,		0,	0x10F	},
+	{ "file",				required_argument,	0,	'o'	},
+	{ "help",				no_argument,		0,	'h'	},
+	{ "kwl",				required_argument,	0,	'k'	},
+	{ "sep",				required_argument,	0,	'p'	},
+	{ "ela",				required_argument,	0,	'e'	},
+	{ "numeric",			no_argument,		0,	'n'	},
+	{ "lb",					required_argument,	0,	'b'	},
+	{ "select",				required_argument,	0,	's'	},
+	{ "from",				required_argument,	0,	'f'	},
+	{ "aln",				no_argument,		0,	'l'	},
+	{ "soc",				no_argument,		0,	'c'	},
+	{ "max",				required_argument,	0,	'x'	},
+	{ "min",				required_argument,	0,	'm'	},
+	{ "version",			no_argument,		0,	'v'	},
+	{ "graph",				required_argument,	0,	'g'	},
 	{ NULL,					0,					0, 	0 		},
 };
 
@@ -70,20 +79,21 @@ static void print_help_exit (const char *name)
 	debugf("\n%s - ver: %s\n", name, VERSION);
 	debugf("This application is used to parse big and complex log files.\nIt extracts necessary data for you to observe changes on them affectively.\n");
 
-	debugf("\nparameters;\n");
-	debugf("\t--file-path: used to specify the log file's directory path.\n\t\tThis is MANDATORY field\n");
-	debugf("\t--keyword-list: used to specify special keywords to pick a line. You can use multiple keywords seperated by comma without empty space.\n\t\tThis is MANDATORY field\n");
-	debugf("\t--seperator: used to specify special character to split the picked line.\n\t\tTAB is used if it is not set\n");
-	debugf("\t--element-at: used to specify which element you want to extract after splitting the line.\n\t\tIf this is not used, then whole line will be filtered.\n");
-	debugf("\t--type-is-numeric: used to specify the extracted element's type is numeric.\n\t\tThis is usefull when the extracted field contains numeric and alphanumeric characters together\n\t\tNo parameter required\n");
-	debugf("\t--line-below: used to select a new line that is number of lines below the picket line before\n\t\tThis is usefull when there is no constant string specifier to pick the line that we want to examine\n");
-	debugf("\t--add-line-no: used to specify real line no in the log doc in the new generated file\n\t\tNo parameter required\n");
-	debugf("\t--only-show-changes: used to parameter changes, like \"watch\" property\n\t\tNo parameter required\n");
-	debugf("\t--max-threshold: used to filter numeric values\n\t\ttype-is-numeric arg is used by default with this filter\n");
-	debugf("\t--min-threshold: used to filter numeric values\n\t\ttype-is-numeric arg is used by default with this filter\n");
-	debugf("\t--select: used to pick \"select-th\" line from \"from\" lines\n\t\tfrom arg is must\n\t\tusefull to remove duplicated log lines\n");
-	debugf("\t--from: used to pick \"select-th\" line from \"from\" lines\n\t\tselect arg is must\n\t\tusefull to remove duplicated log lines\n");
-	debugf("\t--sub-priv: used to subtract previous data to the new one\n\t\tuseful when to show instant data ripples\n\t\tntype-is-numeric arg is used by default with this option\n");
+	debugf("\nparameters;\n\n");
+	debugf("\t--file   \t(-o): log file path\n\t\tused to specify the log file's directory path.\n\t\tThis is MANDATORY field\n\n");
+	debugf("\t--kwl    \t(-k): keyword list\n\t\tused to specify special keywords to pick a line. You can use multiple keywords seperated by comma without empty space.\n\t\tThis is MANDATORY field\n\n");
+	debugf("\t--sep    \t(-p): seperator\n\t\tused to specify special character to split the picked line.\n\t\tTAB is used if it is not set\n\n");
+	debugf("\t--ela    \t(-e): element at\n\t\tused to specify which element you want to extract after splitting the line.\n\t\tIf this is not used, then whole line will be filtered.\n\n");
+	debugf("\t--numeric\t(-n): numeric type\n\t\tused to specify the extracted element's type is numeric.\n\t\tThis is usefull when the extracted field contains numeric and alphanumeric characters together\n\t\tNo parameter required\n\n");
+	debugf("\t--lb     \t(-b): line below\n\t\tused to select a new line that is number of lines below the picket line before\n\t\tThis is usefull when there is no constant string specifier to pick the line that we want to examine\n\n");
+	debugf("\t--aln    \t(-l): add line no\n\t\tused to specify real line no in the log doc in the new generated file\n\t\tNo parameter required\n\n");
+	debugf("\t--soc    \t(-c): show only changes\n\t\tused to parameter changes, like \"watch\" property\n\t\tNo parameter required\n\n");
+	debugf("\t--max    \t(-x): max threshold\n\t\tused to filter numeric values\n\t\ttype-is-numeric arg is used by default with this filter\n\n");
+	debugf("\t--min    \t(-m): min threshold\n\t\tused to filter numeric values\n\t\ttype-is-numeric arg is used by default with this filter\n\n");
+	debugf("\t--select \t(-s): select\n\t\tused to pick \"select-th\" line from \"from\" lines\n\t\tfrom arg is must\n\t\tusefull to remove duplicated log lines\n\n");
+	debugf("\t--from   \t(-f): from\n\t\tused to pick \"select-th\" line from \"from\" lines\n\t\tselect arg is must\n\t\tusefull to remove duplicated log lines\n\n");
+	debugf("\t--version\t(-v): show version\n\n");
+	debugf("\t--graph  \t(-g): draw graph\n\t\tcreates graph from the extracted data\n\t\tuseful when to visualize the data\n\t\trequires argument which is file path for newly created image\n\t\ttype-is-numeric arg is used by default with this filter\n\n");
 
 	debugf("\n");
 
@@ -98,7 +108,7 @@ static int create_keyword_list_list(struct parser *parser)
 	char *delim = DELIM;
 
 	if (!parser || !parser->keyword_list || !strlen(parser->keyword_list) || !delim || !strlen(delim)) {
-		errorf("[%d]: wrong prm\n", __LINE__);
+		errorf("wrong prm\n");
 		return NOK;
 	}
 
@@ -108,13 +118,13 @@ static int create_keyword_list_list(struct parser *parser)
 	
 		entry = calloc(1, sizeof(struct entry));
 		if (!entry) {
-			errorf("[%d]: calloc failed\n", __LINE__);
+			errorf("calloc failed\n");
 			return NOK;
 		}
 
 		entry->word = strdup(token);
 		if (!entry->word) {
-			errorf("[%d]: strdup failed\n", __LINE__);
+			errorf("strdup failed\n");
 			return NOK;
 		}
 
@@ -122,6 +132,19 @@ static int create_keyword_list_list(struct parser *parser)
 	}
 
 	return OK;
+}
+
+static void destroy_data_list(struct parser *parser)
+{
+	struct image_data_entry *entry;
+	struct image_data_entry *entry_next;
+
+	entry = TAILQ_FIRST(&parser->image_data_tailq);
+	while (entry != NULL) {
+		entry_next = TAILQ_NEXT(entry, entries);
+		FREE(entry);
+		entry = entry_next;
+	}
 }
 
 static void destroy_keyword_list_list(struct parser *parser)
@@ -143,7 +166,7 @@ static int contains_necessary_keywords(struct  parser *parser, char *line)
 	struct entry *entry;
 
 	if (!parser || !line) {
-		errorf("[%d]: wrong prm\n", __LINE__);
+		errorf("wrong prm\n");
 		return NOK;
 	}
 
@@ -180,6 +203,108 @@ static void trim_empty_spaces(char *data, unsigned int max_len)
 	memmove(data, &data[starting_idx], max_len - starting_idx);
 }
 
+static void data_mapping_process(struct image_data_tailq *image_data_tailq, long max_val, long *total_data)
+{
+	long i = 0;
+	double dividor = ceil((double)((double)max_val / (double)IMAGE_HEIGHT));
+	double multiplier = round((double)((double)IMAGE_HEIGHT / (double)max_val));
+	struct image_data_entry *entry = NULL;
+
+	if (!image_data_tailq) {
+		errorf("arg is NULL\n");
+		return;
+	}
+
+	TAILQ_FOREACH(entry, image_data_tailq, entries) {
+		if (max_val < IMAGE_HEIGHT) {
+			entry->data = (long)(entry->data * multiplier);
+		} else {
+			entry->data = (long)(entry->data / dividor);
+		}
+
+		i++;
+	}
+
+	*total_data = i;
+}
+
+static int create_image(struct parser *parser, long max_val)
+{
+	FILE *pgmimg = NULL;
+	int i = 0, j = 0;
+	long total_data = 0;
+	char filepath[ONE_LINE_MAX_LEN] = {0};
+	struct image_data_entry *entry = NULL;
+	int image_height = IMAGE_HEIGHT;
+
+	if (!parser) {
+		errorf("arg is NULL\n");
+		return NOK;
+	}
+
+	data_mapping_process(&(parser->image_data_tailq), max_val, &total_data);
+
+	if ((int)(total_data * (EMPTY_WIDTH + PIXEL_WIDTH)) > IMAGE_MAX_WIDTH) {
+		errorf("data is too long, please shorten it to draw graph\n");
+		return OK;
+	}
+
+	image_height = (int)((double)image_height * 1.2);
+
+	snprintf(filepath, ONE_LINE_MAX_LEN, "%s/%s", parser->image_file_path, IMAGE_NAME);
+
+	pgmimg = fopen(filepath, "wb");
+	if (!pgmimg) {
+		errorf("fopen failed\n");
+		return NOK;
+	}
+
+	fprintf(pgmimg, "P2\n");
+	fprintf(pgmimg, "%d %d\n", (int)(total_data * (EMPTY_WIDTH + PIXEL_WIDTH)), (int)image_height);
+
+	for (i = image_height - 1; i >= 0; i--) {
+		TAILQ_FOREACH(entry, &(parser->image_data_tailq), entries) {
+			for (j = 0; j < PIXEL_WIDTH; j++) {
+				if (entry->data < i) {
+					fprintf(pgmimg, "255 ");
+				} else {
+					fprintf(pgmimg, "0 ");
+				}
+			}
+			for (j = 0; j < EMPTY_WIDTH; j++) {
+				fprintf(pgmimg, "255 ");
+			}
+		}
+		fprintf(pgmimg, "\n");
+	}
+
+	fclose(pgmimg);
+
+	return OK;
+}
+
+static int insert_data_to_data_queue(long data, struct image_data_tailq *image_data_tailq)
+{
+	struct image_data_entry *entry = NULL;
+
+	if (!image_data_tailq) {
+		errorf("arg is NULL\n");
+		return NOK;
+	}
+
+	entry = calloc(1, sizeof(struct image_data_entry));
+	if (!entry) {
+		errorf("calloc failed\n");
+		return NOK;
+	}
+
+	entry->data = data;
+
+	TAILQ_INSERT_TAIL(image_data_tailq, entry, entries);
+
+	return OK;
+}
+
 static int extract_data(struct parser *parser)
 {
 	unsigned int element_cnt = 0;
@@ -189,19 +314,23 @@ static int extract_data(struct parser *parser)
     char *token;
 	char temp[ONE_LINE_MAX_LEN] = {0};
 	char temp_priv[ONE_LINE_MAX_LEN] = {0};
-	long value_priv = 0;
+	long max_value = LONG_MIN;
 
 	memset(temp_priv, 0, sizeof(temp_priv));
 
 	if (!parser) {
-		errorf("[%d]: wrong prm\n", __LINE__);
+		errorf("wrong prm\n");
 		return NOK;
 	}
 
 	parser->fp = fopen(parser->file_path, "r");
 	if (!parser->fp) {
-		errorf("[%d]: fopen failed\n", __LINE__);
+		errorf("fopen failed\n");
 		return NOK;
+	}
+
+	if (parser->image_file_path) {
+		TAILQ_INIT(&(parser->image_data_tailq));
 	}
 
 	memset(buffer, 0, sizeof(buffer));
@@ -266,7 +395,6 @@ skip_seperator:
 
 					char *ptr = NULL;
 					long value = 0;
-					long value_temp = 0;
 					unsigned int i = 0;
 					unsigned int starting_pos = 0;
 					unsigned int ending_pos = 0;
@@ -284,6 +412,9 @@ skip_seperator:
 							break;
 						}
 					}
+					if (!starting_pos && !ending_pos) {
+						continue;
+					}
 
 					if (starting_pos <= strlen(token) - 1 && ending_pos >= starting_pos) {
 						token[ending_pos + 1] = '\0';
@@ -294,15 +425,17 @@ skip_seperator:
 						}
 					}
 
-					value_temp = value;
+					snprintf(temp, sizeof(temp), "%ld", value);
 
-					if (parser->sub_priv) {
-						value = value - value_priv;
+					if (value > max_value) {
+						max_value = value;
 					}
 
-					value_priv = value_temp;
-
-					snprintf(temp, sizeof(temp), "%ld", value);
+					if (parser->image_file_path) {
+						if (insert_data_to_data_queue(value, &(parser->image_data_tailq)) == NOK) {
+							errorf("insert failed\n");
+						}
+					}
 
 					if (parser->min_thres != LONG_MAX && value < parser->min_thres) {
 						continue;
@@ -344,6 +477,12 @@ out:
 	errorf("TOTAL SHOWED LINES: %ld\n", (parser->total_fount_cnt / parser->from));
 	errorf("\n**********************************************************\n");
 
+	if (parser->image_file_path) {
+		if (create_image(parser, max_value) == NOK) {
+			errorf("create_image() failed\n");
+		}
+	}
+
 	return OK;
 }
 
@@ -358,7 +497,6 @@ static void init_parser(struct parser *parser)
 	parser->type_is_numeric = false;
 	parser->add_line_no = false;
 	parser->only_show_changes = false;
-	parser->sub_priv = false;
 	parser->select = 0;
 	parser->from = 1;
 	parser->line_below = 0;
@@ -378,6 +516,7 @@ static void deinit_parser(struct parser *parser)
 
 	FREE(parser->file_path);
 	FREE(parser->keyword_list);
+	FREE(parser->image_file_path);
 
 	FCLOSE(parser->fp);
 }
@@ -385,6 +524,7 @@ static void deinit_parser(struct parser *parser)
 static void sigint_handler(__attribute__((unused)) int sig_num)
 {
 	destroy_keyword_list_list(&parser);
+	destroy_data_list(&parser);
 	deinit_parser(&parser);
 
 	errorf("\n**********************************************************\n");
@@ -409,7 +549,7 @@ int main(int argc, char **argv)
 
 	while ((c = getopt_long(argc, argv, "h", parameters, &o)) != -1) {
 		switch (c) {
-			case 0x0FF:
+			case 'o':
 				parser.file_path = strdup(optarg);
 				if (!parser.file_path) {
 					errorf("strdup failed\n");
@@ -421,17 +561,17 @@ int main(int argc, char **argv)
 					return NOK;
 				}
 				break;
-			case 0x100:
+			case 'h':
 				print_help_exit(argv[0]);
 				break;
-			case 0x101:
+			case 'k':
 				parser.keyword_list = strdup(optarg);
 				if (!parser.keyword_list) {
 					errorf("strdup failed\n");
 					return NOK;
 				}
 				break;
-			case 0x102:
+			case 'p':
 				if (optarg && strlen(optarg) > 0) {
 					parser.seperator[0] = optarg[0];
 					parser.seperator[1] = '\0';
@@ -440,77 +580,86 @@ int main(int argc, char **argv)
 					return NOK;
 				}
 				break;
-			case 0x103:
+			case 'e':
 				parser.element_at = strtoul(optarg, &ptr, 10);
 
 				if (ptr && strlen(ptr) > 0) {
-					debugf("unknown arg content: %s\n", ptr);
+					errorf("unknown arg content: %s\n", ptr);
 					return NOK;
 				}
 				break;
-			case 0x104:
+			case 'n':
 				parser.type_is_numeric = true;
 				break;
-			case 0x107:
+			case 'l':
 				parser.add_line_no = true;
 				break;
-			case 0x108:
+			case 'c':
 				parser.only_show_changes = true;
 				break;
-			case 0x10A:
+			case 's':
 				parser.select = strtoul(optarg, &ptr, 10);
 
 				if (ptr && strlen(ptr) > 0) {
-					debugf("unknown arg content: %s\n", ptr);
+					errorf("unknown arg content: %s\n", ptr);
 					return NOK;
 				}
 				break;
-			case 0x10B:
+			case 'f':
 				parser.from = strtoul(optarg, &ptr, 10);
 
 				if (ptr && strlen(ptr) > 0) {
-					debugf("unknown arg content: %s\n", ptr);
+					errorf("unknown arg content: %s\n", ptr);
 					return NOK;
 				}
 				break;
-			case 0x106:
+			case 'b':
 				parser.line_below = strtoul(optarg, &ptr, 10);
 
 				if (ptr && strlen(ptr) > 0) {
-					debugf("unknown arg content: %s\n", ptr);
+					errorf("unknown arg content: %s\n", ptr);
 					return NOK;
 				}
 				break;
-			case 0x109:
+			case 'x':
 				parser.max_thres = strtol(optarg, &ptr, 10);
 
 				if (ptr && strlen(ptr) > 0) {
-					debugf("unknown arg content: %s\n", ptr);
+					errorf("unknown arg content: %s\n", ptr);
 					return NOK;
 				}
 				break;
-			case 0x10C:
+			case 'm':
 				parser.min_thres = strtol(optarg, &ptr, 10);
 
 				if (ptr && strlen(ptr) > 0) {
-					debugf("unknown arg content: %s\n", ptr);
+					errorf("unknown arg content: %s\n", ptr);
 					return NOK;
 				}
 				break;
-			case 0x10E:
-				parser.sub_priv = true;
-				break;
-			case 0x10F:
-				debugf("\n%s - ver: %s\n", argv[0], VERSION);
+			case 'v':
+				errorf("\n%s - ver: %s\n", argv[0], VERSION);
 				return OK;
+			case 'g':
+				parser.image_file_path = strdup(optarg);
+				if (!parser.image_file_path) {
+					errorf("strdup failed\n");
+					return NOK;
+				}
+
+				if (!parser.image_file_path || !strlen(parser.image_file_path)) {
+					errorf("image_file_path seems wrong\n");
+					return NOK;
+				}
+				break;
 			default:
-				debugf("unknown argument\n");
+				errorf("unknown argument\n");
 				return NOK;
 		}
 	}
 
 	if (!parser.file_path) {
-		errorf("file-path is mandatory\n");
+		errorf("'file' argument is mandatory\n");
 		print_help_exit(argv[0]);
 	}
 
@@ -533,7 +682,7 @@ int main(int argc, char **argv)
 		parser.type_is_numeric = true;
 	}
 
-	if (parser.sub_priv) {
+	if (parser.image_file_path) {
 		parser.type_is_numeric = true;
 	}
 
@@ -556,6 +705,7 @@ fail:
 
 out:
 	destroy_keyword_list_list(&parser);
+	destroy_data_list(&parser);
 	deinit_parser(&parser);
 
 	return ret;

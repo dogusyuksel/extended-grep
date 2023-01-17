@@ -6,12 +6,18 @@
 #include <stdbool.h>
 #include <stdarg.h>
 
-#define VERSION		"01.00"
+#define VERSION		"00.01"
 
 #define OK			0
 #define NOK			1
 
 #define DELIM 		","
+
+#define IMAGE_NAME		"created_graph.pgm"
+#define PIXEL_WIDTH		5
+#define EMPTY_WIDTH		2
+#define IMAGE_HEIGHT	2048
+#define IMAGE_MAX_WIDTH	4049
 
 #define ONE_LINE_MAX_LEN	(2048 + 1)
 

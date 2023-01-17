@@ -6,7 +6,7 @@ TARGET_EXECUTABLE_NAME=egrep
 
 SUBDIRS = 
 
-LIBS :=
+LIBS := -lm
 
 C_SRCS = \
 main.c
