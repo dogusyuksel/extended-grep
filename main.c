@@ -52,22 +52,22 @@ struct parser
 static struct parser parser;
 
 static struct option parameters[] = {
-	{ "file",				required_argument,	0,	'o'	},
-	{ "help",				no_argument,		0,	'h'	},
-	{ "kwl",				required_argument,	0,	'k'	},
-	{ "sep",				required_argument,	0,	'p'	},
-	{ "ela",				required_argument,	0,	'e'	},
-	{ "numeric",			no_argument,		0,	'n'	},
-	{ "lb",					required_argument,	0,	'b'	},
-	{ "select",				required_argument,	0,	's'	},
-	{ "from",				required_argument,	0,	'f'	},
-	{ "aln",				no_argument,		0,	'l'	},
-	{ "soc",				no_argument,		0,	'c'	},
-	{ "max",				required_argument,	0,	'x'	},
-	{ "min",				required_argument,	0,	'm'	},
-	{ "version",			no_argument,		0,	'v'	},
-	{ "graph",				required_argument,	0,	'g'	},
-	{ NULL,					0,					0, 	0 		},
+	{ "logfilepath",		required_argument,	0,		'f'		},
+	{ "help",				no_argument,		0,		'h'		},
+	{ "keywords",			required_argument,	0,		'k'		},
+	{ "seperator",			required_argument,	0,		's'		},
+	{ "elementat",			required_argument,	0,		'e'		},
+	{ "numerictype",		no_argument,		0,		'n'		},
+	{ "linebelow",			required_argument,	0,		'b'		},
+	{ "select",				required_argument,	0,		0x101	},
+	{ "from",				required_argument,	0,		0x100	},
+	{ "showlineno",			no_argument,		0,		'l'		},
+	{ "onlyshowchanges",	no_argument,		0,		'c'		},
+	{ "maxthres",			required_argument,	0,		'x'		},
+	{ "minthres",			required_argument,	0,		'm'		},
+	{ "version",			no_argument,		0,		'v'		},
+	{ "drawgraph",			required_argument,	0,		'g'		},
+	{ NULL,					0,					0,		0 		},
 };
 
 static void print_help_exit (const char *name)
@@ -80,20 +80,20 @@ static void print_help_exit (const char *name)
 	debugf("This application is used to parse big and complex log files.\nIt extracts necessary data for you to observe changes on them affectively.\n");
 
 	debugf("\nparameters;\n\n");
-	debugf("\t--file   \t(-o): log file path\n\t\tused to specify the log file's directory path.\n\t\tThis is MANDATORY field\n\n");
-	debugf("\t--kwl    \t(-k): keyword list\n\t\tused to specify special keywords to pick a line. You can use multiple keywords seperated by comma without empty space.\n\t\tThis is MANDATORY field\n\n");
-	debugf("\t--sep    \t(-p): seperator\n\t\tused to specify special character to split the picked line.\n\t\tTAB is used if it is not set\n\n");
-	debugf("\t--ela    \t(-e): element at\n\t\tused to specify which element you want to extract after splitting the line.\n\t\tIf this is not used, then whole line will be filtered.\n\n");
-	debugf("\t--numeric\t(-n): numeric type\n\t\tused to specify the extracted element's type is numeric.\n\t\tThis is usefull when the extracted field contains numeric and alphanumeric characters together\n\t\tNo parameter required\n\n");
-	debugf("\t--lb     \t(-b): line below\n\t\tused to select a new line that is number of lines below the picket line before\n\t\tThis is usefull when there is no constant string specifier to pick the line that we want to examine\n\n");
-	debugf("\t--aln    \t(-l): add line no\n\t\tused to specify real line no in the log doc in the new generated file\n\t\tNo parameter required\n\n");
-	debugf("\t--soc    \t(-c): show only changes\n\t\tused to parameter changes, like \"watch\" property\n\t\tNo parameter required\n\n");
-	debugf("\t--max    \t(-x): max threshold\n\t\tused to filter numeric values\n\t\ttype-is-numeric arg is used by default with this filter\n\n");
-	debugf("\t--min    \t(-m): min threshold\n\t\tused to filter numeric values\n\t\ttype-is-numeric arg is used by default with this filter\n\n");
-	debugf("\t--select \t(-s): select\n\t\tused to pick \"select-th\" line from \"from\" lines\n\t\tfrom arg is must\n\t\tusefull to remove duplicated log lines\n\n");
-	debugf("\t--from   \t(-f): from\n\t\tused to pick \"select-th\" line from \"from\" lines\n\t\tselect arg is must\n\t\tusefull to remove duplicated log lines\n\n");
-	debugf("\t--version\t(-v): show version\n\n");
-	debugf("\t--graph  \t(-g): draw graph\n\t\tcreates graph from the extracted data\n\t\tuseful when to visualize the data\n\t\trequires argument which is file path for newly created image\n\t\ttype-is-numeric arg is used by default with this filter\n\n");
+	debugf("\t%s--logfilepath%s     \t(-f): log file path\n\t\tused to specify the log file's directory path.\n\t\tThis is %sMANDATORY%s field\n\n", ANSI_COLOR_BLUE, ANSI_COLOR_RESET, ANSI_COLOR_RED, ANSI_COLOR_RESET);
+	debugf("\t%s--keywords%s        \t(-k): keyword list\n\t\tused to specify special keywords to pick a line. You can use multiple keywords seperated by comma without empty space.\n\t\tThis is %sMANDATORY%s field\n\n", ANSI_COLOR_BLUE, ANSI_COLOR_RESET, ANSI_COLOR_RED, ANSI_COLOR_RESET);
+	debugf("\t%s--seperator%s       \t(-ps): seperator\n\t\tused to specify special character to split the picked line.\n\t\tTAB is used if it is not set\n\n", ANSI_COLOR_BLUE, ANSI_COLOR_RESET);
+	debugf("\t%s--elementat%s       \t(-e): element at\n\t\tused to specify which element you want to extract after splitting the line.\n\t\tIf this is not used, then whole line will be filtered.\n\n", ANSI_COLOR_BLUE, ANSI_COLOR_RESET);
+	debugf("\t%s--numerictype%s     \t(-n): numeric type\n\t\tused to specify the extracted element's type is numeric.\n\t\tThis is usefull when the extracted field contains numeric and alphanumeric characters together\n\t\tNo parameter required\n\n", ANSI_COLOR_BLUE, ANSI_COLOR_RESET);
+	debugf("\t%s--linebelow%s       \t(-b): line below\n\t\tused to select a new line that is number of lines below the picket line before\n\t\tThis is usefull when there is no constant string specifier to pick the line that we want to examine\n\n", ANSI_COLOR_BLUE, ANSI_COLOR_RESET);
+	debugf("\t%s--showlineno%s      \t(-l): add line no\n\t\tused to specify real line no in the log doc in the new generated file\n\t\tNo parameter required\n\n", ANSI_COLOR_BLUE, ANSI_COLOR_RESET);
+	debugf("\t%s--onlyshowchanges%s \t(-c): show only changes\n\t\tused to parameter changes, like \"watch\" property\n\t\tNo parameter required\n\n", ANSI_COLOR_BLUE, ANSI_COLOR_RESET);
+	debugf("\t%s--maxthres%s        \t(-x): max threshold\n\t\tused to filter numeric values\n\t\tnumerictype arg is used by default with this filter\n\n", ANSI_COLOR_BLUE, ANSI_COLOR_RESET);
+	debugf("\t%s--minthres%s        \t(-m): min threshold\n\t\tused to filter numeric values\n\t\tnumerictype arg is used by default with this filter\n\n", ANSI_COLOR_BLUE, ANSI_COLOR_RESET);
+	debugf("\t%s--select%s          \t    : select\n\t\tused to pick \"select-th\" line from \"from\" lines\n\t\tfrom arg is must\n\t\tusefull to remove duplicated log lines\n\n", ANSI_COLOR_BLUE, ANSI_COLOR_RESET);
+	debugf("\t%s--from%s            \t    : from\n\t\tused to pick \"select-th\" line from \"from\" lines\n\t\tselect arg is must\n\t\tusefull to remove duplicated log lines\n\n", ANSI_COLOR_BLUE, ANSI_COLOR_RESET);
+	debugf("\t%s--version%s         \t(-v): show version\n\n", ANSI_COLOR_BLUE, ANSI_COLOR_RESET);
+	debugf("\t%s--drawgraph%s       \t(-g): draw graph\n\t\tcreates graph from the extracted data\n\t\tuseful when to visualize the data\n\t\trequires argument which is file path for newly created image\n\t\tnumerictype arg is used by default with this filter\n\n", ANSI_COLOR_BLUE, ANSI_COLOR_RESET);
 
 	debugf("\n");
 
@@ -315,6 +315,7 @@ static int extract_data(struct parser *parser)
 	char temp[ONE_LINE_MAX_LEN] = {0};
 	char temp_priv[ONE_LINE_MAX_LEN] = {0};
 	long max_value = LONG_MIN;
+	long value_priv = 0;
 
 	memset(temp_priv, 0, sizeof(temp_priv));
 
@@ -431,17 +432,23 @@ skip_seperator:
 						max_value = value;
 					}
 
-					if (parser->image_file_path) {
-						if (insert_data_to_data_queue(value, &(parser->image_data_tailq)) == NOK) {
-							errorf("insert failed\n");
-						}
-					}
-
 					if (parser->min_thres != LONG_MAX && value < parser->min_thres) {
 						continue;
 					}
 					if (parser->max_thres != LONG_MAX && value > parser->max_thres) {
 						continue;
+					}
+
+					if (parser->only_show_changes && value == value_priv) {
+						continue;
+					}
+
+					value_priv = value;
+
+					if (parser->image_file_path) {
+						if (insert_data_to_data_queue(value, &(parser->image_data_tailq)) == NOK) {
+							errorf("insert failed\n");
+						}
 					}
 				} else {
 					snprintf(temp, sizeof(temp), "%s", token);
@@ -549,7 +556,7 @@ int main(int argc, char **argv)
 
 	while ((c = getopt_long(argc, argv, "h", parameters, &o)) != -1) {
 		switch (c) {
-			case 'o':
+			case 'f':
 				parser.file_path = strdup(optarg);
 				if (!parser.file_path) {
 					errorf("strdup failed\n");
@@ -571,7 +578,7 @@ int main(int argc, char **argv)
 					return NOK;
 				}
 				break;
-			case 'p':
+			case 's':
 				if (optarg && strlen(optarg) > 0) {
 					parser.seperator[0] = optarg[0];
 					parser.seperator[1] = '\0';
@@ -597,7 +604,7 @@ int main(int argc, char **argv)
 			case 'c':
 				parser.only_show_changes = true;
 				break;
-			case 's':
+			case 0x101:
 				parser.select = strtoul(optarg, &ptr, 10);
 
 				if (ptr && strlen(ptr) > 0) {
@@ -605,7 +612,7 @@ int main(int argc, char **argv)
 					return NOK;
 				}
 				break;
-			case 'f':
+			case 0x100:
 				parser.from = strtoul(optarg, &ptr, 10);
 
 				if (ptr && strlen(ptr) > 0) {
