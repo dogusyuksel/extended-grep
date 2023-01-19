@@ -25,7 +25,7 @@
 #define PIXEL_WIDTH		5
 #define EMPTY_WIDTH		2
 #define IMAGE_HEIGHT	2048
-#define IMAGE_MAX_WIDTH	4049
+#define IMAGE_MAX_WIDTH	64000
 
 #define ONE_LINE_MAX_LEN	(2048 + 1)
 
