@@ -84,8 +84,9 @@ No third party packets used in this project.
 
 <!-- ARGUMENTS -->
 <h2 id="arguments-details"> Arguments' Details</h2>
-<p> 
-  	--logfilepath     	(-f): log file path
+<p>    
+
+	--logfilepath     	(-f): log file path
 		used to specify the log file's directory path.
 		This is MANDATORY field
 
