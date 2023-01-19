@@ -59,8 +59,8 @@ static struct option parameters[] = {
 	{ "elementat",			required_argument,	0,		'e'		},
 	{ "numerictype",		no_argument,		0,		'n'		},
 	{ "linebelow",			required_argument,	0,		'b'		},
-	{ "select",				required_argument,	0,		0x101	},
-	{ "from",				required_argument,	0,		0x100	},
+	{ "select",				required_argument,	0,		't'		},
+	{ "from",				required_argument,	0,		'r'		},
 	{ "showlineno",			no_argument,		0,		'l'		},
 	{ "onlyshowchanges",	no_argument,		0,		'c'		},
 	{ "maxthres",			required_argument,	0,		'x'		},
@@ -82,7 +82,7 @@ static void print_help_exit (const char *name)
 	debugf("\nparameters;\n\n");
 	debugf("\t%s--logfilepath%s     \t(-f): log file path\n\t\tused to specify the log file's directory path.\n\t\tThis is %sMANDATORY%s field\n\n", ANSI_COLOR_BLUE, ANSI_COLOR_RESET, ANSI_COLOR_RED, ANSI_COLOR_RESET);
 	debugf("\t%s--keywords%s        \t(-k): keyword list\n\t\tused to specify special keywords to pick a line. You can use multiple keywords seperated by comma without empty space.\n\t\tThis is %sMANDATORY%s field\n\n", ANSI_COLOR_BLUE, ANSI_COLOR_RESET, ANSI_COLOR_RED, ANSI_COLOR_RESET);
-	debugf("\t%s--seperator%s       \t(-ps): seperator\n\t\tused to specify special character to split the picked line.\n\t\tTAB is used if it is not set\n\n", ANSI_COLOR_BLUE, ANSI_COLOR_RESET);
+	debugf("\t%s--seperator%s       \t(-s): seperator\n\t\tused to specify special character to split the picked line.\n\t\tTAB is used if it is not set\n\n", ANSI_COLOR_BLUE, ANSI_COLOR_RESET);
 	debugf("\t%s--elementat%s       \t(-e): element at\n\t\tused to specify which element you want to extract after splitting the line.\n\t\tIf this is not used, then whole line will be filtered.\n\n", ANSI_COLOR_BLUE, ANSI_COLOR_RESET);
 	debugf("\t%s--numerictype%s     \t(-n): numeric type\n\t\tused to specify the extracted element's type is numeric.\n\t\tThis is usefull when the extracted field contains numeric and alphanumeric characters together\n\t\tNo parameter required\n\n", ANSI_COLOR_BLUE, ANSI_COLOR_RESET);
 	debugf("\t%s--linebelow%s       \t(-b): line below\n\t\tused to select a new line that is number of lines below the picket line before\n\t\tThis is usefull when there is no constant string specifier to pick the line that we want to examine\n\n", ANSI_COLOR_BLUE, ANSI_COLOR_RESET);
@@ -90,8 +90,8 @@ static void print_help_exit (const char *name)
 	debugf("\t%s--onlyshowchanges%s \t(-c): show only changes\n\t\tused to parameter changes, like \"watch\" property\n\t\tNo parameter required\n\n", ANSI_COLOR_BLUE, ANSI_COLOR_RESET);
 	debugf("\t%s--maxthres%s        \t(-x): max threshold\n\t\tused to filter numeric values\n\t\tnumerictype arg is used by default with this filter\n\n", ANSI_COLOR_BLUE, ANSI_COLOR_RESET);
 	debugf("\t%s--minthres%s        \t(-m): min threshold\n\t\tused to filter numeric values\n\t\tnumerictype arg is used by default with this filter\n\n", ANSI_COLOR_BLUE, ANSI_COLOR_RESET);
-	debugf("\t%s--select%s          \t    : select\n\t\tused to pick \"select-th\" line from \"from\" lines\n\t\tfrom arg is must\n\t\tusefull to remove duplicated log lines\n\n", ANSI_COLOR_BLUE, ANSI_COLOR_RESET);
-	debugf("\t%s--from%s            \t    : from\n\t\tused to pick \"select-th\" line from \"from\" lines\n\t\tselect arg is must\n\t\tusefull to remove duplicated log lines\n\n", ANSI_COLOR_BLUE, ANSI_COLOR_RESET);
+	debugf("\t%s--select%s          \t(-t): select\n\t\tused to pick \"select-th\" line from \"from\" lines\n\t\tfrom arg is must\n\t\tusefull to remove duplicated log lines\n\n", ANSI_COLOR_BLUE, ANSI_COLOR_RESET);
+	debugf("\t%s--from%s            \t(-r): from\n\t\tused to pick \"select-th\" line from \"from\" lines\n\t\tselect arg is must\n\t\tusefull to remove duplicated log lines\n\n", ANSI_COLOR_BLUE, ANSI_COLOR_RESET);
 	debugf("\t%s--version%s         \t(-v): show version\n\n", ANSI_COLOR_BLUE, ANSI_COLOR_RESET);
 	debugf("\t%s--drawgraph%s       \t(-g): draw graph\n\t\tcreates graph from the extracted data\n\t\tuseful when to visualize the data\n\t\trequires argument which is file path for newly created image\n\t\tnumerictype arg is used by default with this filter\n\n", ANSI_COLOR_BLUE, ANSI_COLOR_RESET);
 
@@ -554,7 +554,7 @@ int main(int argc, char **argv)
 
 	init_parser(&parser);
 
-	while ((c = getopt_long(argc, argv, "h", parameters, &o)) != -1) {
+	while ((c = getopt_long(argc, argv, "hnlcvf:k:s:e:b:t:r:x:m:g:", parameters, &o)) != -1) {
 		switch (c) {
 			case 'f':
 				parser.file_path = strdup(optarg);
@@ -604,7 +604,7 @@ int main(int argc, char **argv)
 			case 'c':
 				parser.only_show_changes = true;
 				break;
-			case 0x101:
+			case 't':
 				parser.select = strtoul(optarg, &ptr, 10);
 
 				if (ptr && strlen(ptr) > 0) {
@@ -612,7 +612,7 @@ int main(int argc, char **argv)
 					return NOK;
 				}
 				break;
-			case 0x100:
+			case 'r':
 				parser.from = strtoul(optarg, &ptr, 10);
 
 				if (ptr && strlen(ptr) > 0) {
