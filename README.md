@@ -102,11 +102,6 @@ No third party packets used in this project.
 		used to specify which element you want to extract after splitting the line.
 		If this is not used, then whole line will be filtered.
 
-	--numerictype     	(-n): numeric type
-		used to specify the extracted element's type is numeric.
-		This is usefull when the extracted field contains numeric and alphanumeric characters together
-		No parameter required
-
 	--linebelow       	(-b): line below
 		used to select a new line that is number of lines below the picket line before
 		This is usefull when there is no constant string specifier to pick the line that we want to examine
@@ -121,11 +116,9 @@ No third party packets used in this project.
 
 	--maxthres        	(-x): max threshold
 		used to filter numeric values
-		numerictype arg is used by default with this filter
 
 	--minthres        	(-m): min threshold
 		used to filter numeric values
-		numerictype arg is used by default with this filter
 
 	--select          	    : select
 		used to pick "select-th" line from "from" lines
@@ -143,7 +136,10 @@ No third party packets used in this project.
 		creates graph from the extracted data
 		useful when to visualize the data
 		requires argument which is file path for newly created image
-		numerictype arg is used by default with this filter
+
+	--startlineno     	(-i): show results after the line given as argument
+
+	--endlineno       	(-j): show results before the line given as argument
 
 
 

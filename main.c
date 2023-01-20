@@ -29,7 +29,6 @@ TAILQ_HEAD(image_data_tailq, image_data_entry);
 
 struct parser
 {
-	bool type_is_numeric;
 	bool add_line_no;
 	bool only_show_changes;
 	unsigned int from;
@@ -37,7 +36,10 @@ struct parser
 	unsigned int element_at;
 	unsigned int line_below;
 	unsigned long line_cnt;
-	unsigned long total_fount_cnt;
+	unsigned long total_found_cnt;
+	unsigned long total_showed_cnt;
+	unsigned long start_lineno;
+	unsigned long end_lineno;
 	long max_thres;
 	long min_thres;
 	long max_value;
@@ -59,7 +61,6 @@ static struct option parameters[] = {
 	{ "keywords",			required_argument,	0,		'k'		},
 	{ "seperator",			required_argument,	0,		's'		},
 	{ "elementat",			required_argument,	0,		'e'		},
-	{ "numerictype",		no_argument,		0,		'n'		},
 	{ "linebelow",			required_argument,	0,		'b'		},
 	{ "select",				required_argument,	0,		't'		},
 	{ "from",				required_argument,	0,		'r'		},
@@ -69,6 +70,8 @@ static struct option parameters[] = {
 	{ "minthres",			required_argument,	0,		'm'		},
 	{ "version",			no_argument,		0,		'v'		},
 	{ "drawgraph",			required_argument,	0,		'g'		},
+	{ "startlineno",		required_argument,	0,		'i'		},
+	{ "endlineno",			required_argument,	0,		'j'		},
 	{ NULL,					0,					0,		0 		},
 };
 
@@ -86,7 +89,6 @@ static void print_help_exit (const char *name)
 	debugf("\t%s--keywords%s        \t(-k): keyword list\n\t\tused to specify special keywords to pick a line. You can use multiple keywords seperated by comma without empty space.\n\t\tThis is %sMANDATORY%s field\n\n", ANSI_COLOR_BLUE, ANSI_COLOR_RESET, ANSI_COLOR_RED, ANSI_COLOR_RESET);
 	debugf("\t%s--seperator%s       \t(-s): seperator\n\t\tused to specify special character to split the picked line.\n\t\tTAB is used if it is not set\n\n", ANSI_COLOR_BLUE, ANSI_COLOR_RESET);
 	debugf("\t%s--elementat%s       \t(-e): element at\n\t\tused to specify which element you want to extract after splitting the line.\n\t\tIf this is not used, then whole line will be filtered.\n\n", ANSI_COLOR_BLUE, ANSI_COLOR_RESET);
-	debugf("\t%s--numerictype%s     \t(-n): numeric type\n\t\tused to specify the extracted element's type is numeric.\n\t\tThis is usefull when the extracted field contains numeric and alphanumeric characters together\n\t\tNo parameter required\n\n", ANSI_COLOR_BLUE, ANSI_COLOR_RESET);
 	debugf("\t%s--linebelow%s       \t(-b): line below\n\t\tused to select a new line that is number of lines below the picket line before\n\t\tThis is usefull when there is no constant string specifier to pick the line that we want to examine\n\n", ANSI_COLOR_BLUE, ANSI_COLOR_RESET);
 	debugf("\t%s--showlineno%s      \t(-l): add line no\n\t\tused to specify real line no in the log doc in the new generated file\n\t\tNo parameter required\n\n", ANSI_COLOR_BLUE, ANSI_COLOR_RESET);
 	debugf("\t%s--onlyshowchanges%s \t(-c): show only changes\n\t\tused to parameter changes, like \"watch\" property\n\t\tNo parameter required\n\n", ANSI_COLOR_BLUE, ANSI_COLOR_RESET);
@@ -96,6 +98,8 @@ static void print_help_exit (const char *name)
 	debugf("\t%s--from%s            \t(-r): from\n\t\tused to pick \"select-th\" line from \"from\" lines\n\t\tselect arg is must\n\t\tusefull to remove duplicated log lines\n\n", ANSI_COLOR_BLUE, ANSI_COLOR_RESET);
 	debugf("\t%s--version%s         \t(-v): show version\n\n", ANSI_COLOR_BLUE, ANSI_COLOR_RESET);
 	debugf("\t%s--drawgraph%s       \t(-g): draw graph\n\t\tcreates graph from the extracted data\n\t\tuseful when to visualize the data\n\t\trequires argument which is file path for newly created image\n\t\tnumerictype arg is used by default with this filter\n\n", ANSI_COLOR_BLUE, ANSI_COLOR_RESET);
+	debugf("\t%s--startlineno%s     \t(-i): show results after the line given as argument\n\n", ANSI_COLOR_BLUE, ANSI_COLOR_RESET);
+	debugf("\t%s--endlineno%s       \t(-j): show results before the line given as argument\n\n", ANSI_COLOR_BLUE, ANSI_COLOR_RESET);
 
 	debugf("\n");
 
@@ -181,33 +185,10 @@ static int contains_necessary_keywords(struct  parser *parser, char *line)
 	return OK;
 }
 
-static void trim_empty_spaces(char *data, unsigned int max_len)
-{
-	unsigned int i = 0;
-	unsigned int starting_idx = 0;
-	unsigned int ending_idx = 0;
-	unsigned int len = 0;
-
-	if (!data) {
-		return;
-	}
-
-	len = strlen(data);
-	while(data[i++] == ' ');
-	starting_idx = i - 1;
-
-	i = len -1;
-	while(data[i--] == ' ');
-	ending_idx = i + 1;
-
-	data[ending_idx + 1] = '\0';
-
-	memmove(data, &data[starting_idx], max_len - starting_idx);
-}
-
-static void data_mapping_process(struct image_data_tailq *image_data_tailq, long max_val, long *total_data)
+static void data_mapping_process(struct image_data_tailq *image_data_tailq, long max_val, long min_val, long *total_data)
 {
 	long i = 0;
+	long new_max_value = max_val;
 	double dividor = ceil((double)((double)max_val / (double)IMAGE_HEIGHT));
 	double multiplier = round((double)((double)IMAGE_HEIGHT / (double)max_val));
 	struct image_data_entry *entry = NULL;
@@ -217,8 +198,18 @@ static void data_mapping_process(struct image_data_tailq *image_data_tailq, long
 		return;
 	}
 
+	if (min_val < 0) {
+		new_max_value += ((-1) * min_val);
+		dividor = ceil((double)((double)new_max_value / (double)IMAGE_HEIGHT));
+		multiplier = round((double)((double)IMAGE_HEIGHT / (double)new_max_value));
+	}
+
 	TAILQ_FOREACH(entry, image_data_tailq, entries) {
-		if (max_val < IMAGE_HEIGHT) {
+		if (min_val < 0) {
+			entry->data += (-1) * min_val;
+		}
+
+		if (new_max_value < IMAGE_HEIGHT) {
 			entry->data = (long)(entry->data * multiplier);
 		} else {
 			entry->data = (long)(entry->data / dividor);
@@ -230,7 +221,7 @@ static void data_mapping_process(struct image_data_tailq *image_data_tailq, long
 	*total_data = i;
 }
 
-static int create_image(struct parser *parser, long max_val)
+static int create_image(struct parser *parser, long max_val, long min_val)
 {
 	FILE *pgmimg = NULL;
 	int i = 0, j = 0;
@@ -240,12 +231,14 @@ static int create_image(struct parser *parser, long max_val)
 	int image_height = IMAGE_HEIGHT;
 	struct entry *kw_entry = NULL;
 
+	UNUSED(min_val);
+
 	if (!parser) {
 		errorf("arg is NULL\n");
 		return NOK;
 	}
 
-	data_mapping_process(&(parser->image_data_tailq), max_val, &total_data);
+	data_mapping_process(&(parser->image_data_tailq), max_val, min_val, &total_data);
 
 	if ((int)(total_data * (EMPTY_WIDTH + PIXEL_WIDTH)) > IMAGE_MAX_WIDTH) {
 		errorf("data is too long, please shorten it to draw graph\n");
@@ -318,16 +311,18 @@ static int insert_data_to_data_queue(long data, struct image_data_tailq *image_d
 
 static int extract_data(struct parser *parser)
 {
+	int i = 0;
 	unsigned int element_cnt = 0;
+	unsigned int starting_pos = 0;
+	unsigned int ending_pos = 0;
+	char *ptr = NULL;
 	char buffer[ONE_LINE_MAX_LEN] = {0};
 	char command[ONE_LINE_MAX_LEN] = {0};
 	char *rest = NULL;
     char *token;
 	char temp[ONE_LINE_MAX_LEN] = {0};
-	char temp_priv[ONE_LINE_MAX_LEN] = {0};
 	long value_priv = 0;
-
-	memset(temp_priv, 0, sizeof(temp_priv));
+	long value = 0;
 
 	if (!parser) {
 		errorf("wrong prm\n");
@@ -398,93 +393,81 @@ skip_seperator:
 			}
 
 			if (element_cnt) {
-				parser->total_fount_cnt++;
+				parser->total_found_cnt++;
 			}
 
-			if ((parser->total_fount_cnt - 1) % parser->from == parser->select) {
-				if (parser->type_is_numeric) {
-
-					char *ptr = NULL;
-					long value = 0;
-					unsigned int i = 0;
-					unsigned int starting_pos = 0;
-					unsigned int ending_pos = 0;
-
-					for (i = 0; i < strlen(token); i++) {
-						if (token[i] >= 0x30 && token[i] <= 0x39) {
-							starting_pos = i;
-							break;
-						}
-					}
-
-					for (i = strlen(token) - 1; i > 0; i--) {
-						if (token[i] >= 0x30 && token[i] <= 0x39) {
-							ending_pos = i;
-							break;
-						}
-					}
-					if (!starting_pos && !ending_pos) {
-						continue;
-					}
-
-					if (starting_pos <= strlen(token) - 1 && ending_pos >= starting_pos) {
-						token[ending_pos + 1] = '\0';
-						value = strtol(&token[starting_pos], &ptr, 10);
-
-						if (ptr && strlen(ptr) > 0) {
-							continue;
-						}
-					}
-
-					snprintf(temp, sizeof(temp), "%ld", value);
-
-					if (value > parser->max_value) {
-						parser->max_value = value;
-					}
-					if (value < parser->min_value) {
-						parser->min_value = value;
-					}
-
-					if (parser->min_thres != LONG_MAX && value < parser->min_thres) {
-						continue;
-					}
-					if (parser->max_thres != LONG_MAX && value > parser->max_thres) {
-						continue;
-					}
-
-					if (parser->only_show_changes && value == value_priv) {
-						continue;
-					}
-
-					value_priv = value;
-
-					if (parser->image_file_path) {
-						if (insert_data_to_data_queue(value, &(parser->image_data_tailq)) == NOK) {
-							errorf("insert failed\n");
-						}
-					}
-				} else {
-					snprintf(temp, sizeof(temp), "%s", token);
+			for (i = 0; i < (int)strlen(token); i++) {
+				if ((token[i] >= 0x30 && token[i] <= 0x39) || (token[i] == '-')) {
+					starting_pos = i;
+					break;
 				}
+			}
 
-				if (temp[strlen(temp) - 1] == '\n') {
-					temp[strlen(temp) - 1] = '\0';
+			ending_pos = strlen(token);
+			for (i = strlen(token) - 1; i >= 0; i--) {
+				if ((token[i] >= 0x30 && token[i] <= 0x39) || (token[i] == '-')) {
+					ending_pos = i;
+					break;
 				}
+			}
 
-				if (parser->only_show_changes && !strcmp(temp, temp_priv)) {
+			if (starting_pos <= strlen(token) - 1 && ending_pos >= starting_pos) {
+				token[ending_pos + 1] = '\0';
+				value = strtol(&token[starting_pos], &ptr, 10);
+
+				if (ptr && strlen(ptr) > 0) {
 					continue;
 				}
+			}
 
-				snprintf(temp_priv, sizeof(temp_priv), "%s", temp);
+			if (parser->min_thres != LONG_MAX && value < parser->min_thres) {
+				continue;
+			}
+			if (parser->max_thres != LONG_MAX && value > parser->max_thres) {
+				continue;
+			}
 
-				trim_empty_spaces(temp, sizeof(temp));
+			if (parser->only_show_changes && value == value_priv) {
+				continue;
+			}
 
-				if (parser->add_line_no) {
-					debugf("%s\t%ld\n", temp, parser->line_cnt);
-				} else {
-					debugf("%s\n", temp);
+			value_priv = value;
+
+			snprintf(temp, sizeof(temp), "%ld", value);
+
+			if (parser->start_lineno != UINT_MAX && parser->line_cnt < parser->start_lineno) {
+				continue;
+			}
+
+			if (parser->end_lineno != UINT_MAX && parser->line_cnt > parser->end_lineno) {
+				continue;
+			}
+
+			if (!((parser->total_found_cnt - 1) % parser->from == parser->select)) {
+				continue;
+			}
+
+			if (value > parser->max_value) {
+				parser->max_value = value;
+			}
+			if (value < parser->min_value) {
+				parser->min_value = value;
+			}
+
+			if (parser->image_file_path) {
+				if (insert_data_to_data_queue(value, &(parser->image_data_tailq)) == NOK) {
+					errorf("insert failed\n");
 				}
 			}
+
+			if (parser->add_line_no) {
+				int len = strlen(temp);
+				snprintf(&temp[len - 1], sizeof(temp) - len, "\t%ld", parser->line_cnt);
+			}
+
+			debugf("%s\n", temp);
+
+			parser->total_showed_cnt++;
 		}
 	}
 
@@ -493,15 +476,13 @@ out:
 
 	errorf("\n**********************************************************\n");
 	errorf("TOTAL PROGRESSED LINES: %ld\n", parser->line_cnt);
-	errorf("TOTAL EXTRACTED LINES: %ld\n", parser->total_fount_cnt);
-	errorf("TOTAL SHOWED LINES: %ld\n", (parser->total_fount_cnt / parser->from));
-	if (parser->max_value || parser->min_value) {
-		errorf("MAX: %ld\tMIN: %ld\n", parser->max_value, parser->min_value);
-	}
+	errorf("TOTAL EXTRACTED LINES: %ld\n", parser->total_found_cnt);
+	errorf("TOTAL SHOWED LINES: %ld\n", parser->total_showed_cnt);
+	errorf("MAX: %ld\tMIN: %ld\n", parser->max_value, parser->min_value);
 	errorf("\n**********************************************************\n");
 
 	if (parser->image_file_path) {
-		if (create_image(parser, parser->max_value) == NOK) {
+		if (create_image(parser, parser->max_value, parser->min_value) == NOK) {
 			errorf("create_image() failed\n");
 		}
 	}
@@ -517,7 +498,6 @@ static void init_parser(struct parser *parser)
 	}
 
 	parser->fp = NULL;
-	parser->type_is_numeric = false;
 	parser->add_line_no = false;
 	parser->only_show_changes = false;
 	parser->select = 0;
@@ -530,6 +510,8 @@ static void init_parser(struct parser *parser)
 	parser->max_thres = LONG_MAX;
 	parser->max_value = LONG_MIN;
 	parser->min_value = LONG_MAX;
+	parser->start_lineno = UINT_MAX;
+	parser->end_lineno = UINT_MAX;
 
 }
 
@@ -555,11 +537,9 @@ static void sigint_handler(__attribute__((unused)) int sig_num)
 
 	errorf("\n**********************************************************\n");
 	errorf("TOTAL PROGRESSED LINES: %ld\n", parser.line_cnt);
-	errorf("TOTAL EXTRACTED LINES: %ld\n", parser.total_fount_cnt);
-	errorf("TOTAL SHOWED LINES: %ld\n", (parser.total_fount_cnt / parser.from));
-	if (parser.max_value || parser.min_value) {
-		errorf("MAX: %ld\tMIN: %ld\n", parser.max_value, parser.min_value);
-	}
+	errorf("TOTAL EXTRACTED LINES: %ld\n", parser.total_found_cnt);
+	errorf("TOTAL SHOWED LINES: %ld\n", (parser.total_found_cnt / parser.from));
+	errorf("MAX: %ld\tMIN: %ld\n", parser.max_value, parser.min_value);
 	errorf("\n**********************************************************\n");
 
 	exit(NOK);
@@ -616,9 +596,6 @@ int main(int argc, char **argv)
 					errorf("unknown arg content: %s\n", ptr);
 					return NOK;
 				}
-				break;
-			case 'n':
-				parser.type_is_numeric = true;
 				break;
 			case 'l':
 				parser.add_line_no = true;
@@ -681,6 +658,22 @@ int main(int argc, char **argv)
 					return NOK;
 				}
 				break;
+			case 'i':
+				parser.start_lineno = strtoul(optarg, &ptr, 10);
+
+				if (ptr && strlen(ptr) > 0) {
+					errorf("unknown arg content: %s\n", ptr);
+					return NOK;
+				}
+				break;
+			case 'j':
+				parser.end_lineno = strtoul(optarg, &ptr, 10);
+
+				if (ptr && strlen(ptr) > 0) {
+					errorf("unknown arg content: %s\n", ptr);
+					return NOK;
+				}
+				break;
 			default:
 				errorf("unknown argument\n");
 				return NOK;
@@ -708,11 +701,6 @@ int main(int argc, char **argv)
 			errorf("wrong threshold usage\n");
 			print_help_exit(argv[0]);
 		}
-		parser.type_is_numeric = true;
-	}
-
-	if (parser.image_file_path) {
-		parser.type_is_numeric = true;
 	}
 
 	TAILQ_INIT(&parser.keyword_list_tq);

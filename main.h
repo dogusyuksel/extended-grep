@@ -32,6 +32,8 @@
 #define debugf(...)		fprintf(stdout, __VA_ARGS__)
 #define errorf(...)		fprintf(stderr, __VA_ARGS__)
 
+#define UNUSED(__val__)		((void)__val__)
+
 #define FREE(p)			{										\
 							if (p) {							\
 								free(p);						\
