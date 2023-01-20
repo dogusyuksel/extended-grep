@@ -40,6 +40,8 @@ struct parser
 	unsigned long total_fount_cnt;
 	long max_thres;
 	long min_thres;
+	long max_value;
+	long min_value;
 	char *keyword_list;
 	char *file_path;
 	char *image_file_path;
@@ -236,6 +238,7 @@ static int create_image(struct parser *parser, long max_val)
 	char filepath[ONE_LINE_MAX_LEN] = {0};
 	struct image_data_entry *entry = NULL;
 	int image_height = IMAGE_HEIGHT;
+	struct entry *kw_entry = NULL;
 
 	if (!parser) {
 		errorf("arg is NULL\n");
@@ -251,7 +254,15 @@ static int create_image(struct parser *parser, long max_val)
 
 	image_height = (int)((double)image_height * 1.2);
 
-	snprintf(filepath, ONE_LINE_MAX_LEN, "%s/%s", parser->image_file_path, IMAGE_NAME);
+	snprintf(filepath, ONE_LINE_MAX_LEN, "%s/", parser->image_file_path);
+
+	TAILQ_FOREACH(kw_entry, &(parser->keyword_list_tq), entries) {
+		if (kw_entry->word) {
+			strncat(filepath, kw_entry->word, ONE_LINE_MAX_LEN - strlen(filepath));
+			strncat(filepath, "-", ONE_LINE_MAX_LEN - strlen(filepath));
+		}
+	}
+	strncat(filepath, IMAGE_NAME, ONE_LINE_MAX_LEN - strlen(filepath));
 
 	pgmimg = fopen(filepath, "wb");
 	if (!pgmimg) {
@@ -314,7 +325,6 @@ static int extract_data(struct parser *parser)
     char *token;
 	char temp[ONE_LINE_MAX_LEN] = {0};
 	char temp_priv[ONE_LINE_MAX_LEN] = {0};
-	long max_value = LONG_MIN;
 	long value_priv = 0;
 
 	memset(temp_priv, 0, sizeof(temp_priv));
@@ -428,8 +438,11 @@ skip_seperator:
 
 					snprintf(temp, sizeof(temp), "%ld", value);
 
-					if (value > max_value) {
-						max_value = value;
+					if (value > parser->max_value) {
+						parser->max_value = value;
+					}
+					if (value < parser->min_value) {
+						parser->min_value = value;
 					}
 
 					if (parser->min_thres != LONG_MAX && value < parser->min_thres) {
@@ -482,10 +495,13 @@ out:
 	errorf("TOTAL PROGRESSED LINES: %ld\n", parser->line_cnt);
 	errorf("TOTAL EXTRACTED LINES: %ld\n", parser->total_fount_cnt);
 	errorf("TOTAL SHOWED LINES: %ld\n", (parser->total_fount_cnt / parser->from));
+	if (parser->max_value || parser->min_value) {
+		errorf("MAX: %ld\tMIN: %ld\n", parser->max_value, parser->min_value);
+	}
 	errorf("\n**********************************************************\n");
 
 	if (parser->image_file_path) {
-		if (create_image(parser, max_value) == NOK) {
+		if (create_image(parser, parser->max_value) == NOK) {
 			errorf("create_image() failed\n");
 		}
 	}
@@ -512,6 +528,9 @@ static void init_parser(struct parser *parser)
 	parser->element_at = UINT_MAX;
 	parser->min_thres = LONG_MAX;
 	parser->max_thres = LONG_MAX;
+	parser->max_value = LONG_MIN;
+	parser->min_value = LONG_MAX;
+
 }
 
 static void deinit_parser(struct parser *parser)
@@ -538,6 +557,9 @@ static void sigint_handler(__attribute__((unused)) int sig_num)
 	errorf("TOTAL PROGRESSED LINES: %ld\n", parser.line_cnt);
 	errorf("TOTAL EXTRACTED LINES: %ld\n", parser.total_fount_cnt);
 	errorf("TOTAL SHOWED LINES: %ld\n", (parser.total_fount_cnt / parser.from));
+	if (parser.max_value || parser.min_value) {
+		errorf("MAX: %ld\tMIN: %ld\n", parser.max_value, parser.min_value);
+	}
 	errorf("\n**********************************************************\n");
 
 	exit(NOK);
