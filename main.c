@@ -309,13 +309,56 @@ static int insert_data_to_data_queue(long data, struct image_data_tailq *image_d
 	return OK;
 }
 
-static int extract_data(struct parser *parser)
+static long take_clean_value(char *token)
 {
 	int i = 0;
-	unsigned int element_cnt = 0;
+	long value = 0;
+	char *ptr = NULL;
 	unsigned int starting_pos = 0;
 	unsigned int ending_pos = 0;
-	char *ptr = NULL;
+	char *dup_token = NULL;
+
+	if (!token) {
+		return 0;
+	}
+	dup_token = strdup(token);
+	if (!dup_token) {
+		return 0;
+	}
+
+	for (i = 0; i < (int)strlen(dup_token); i++) {
+		if ((dup_token[i] >= 0x30 && dup_token[i] <= 0x39) || (dup_token[i] == '-')) {
+			starting_pos = i;
+			break;
+		}
+	}
+
+	ending_pos = strlen(dup_token);
+	for (i = strlen(dup_token) - 1; i >= 0; i--) {
+		if ((dup_token[i] >= 0x30 && dup_token[i] <= 0x39) || (dup_token[i] == '-')) {
+			ending_pos = i;
+			break;
+		}
+	}
+
+	if (starting_pos < strlen(dup_token) && ending_pos >= starting_pos) {
+		dup_token[ending_pos + 1] = '\0';
+		value = strtol(&dup_token[starting_pos], &ptr, 10);
+
+		if (ptr && strlen(ptr) > 0) {
+			FREE(dup_token);
+			return 0;
+		}
+	}
+
+	FREE(dup_token);
+
+	return value;
+}
+
+static int extract_data(struct parser *parser)
+{
+	unsigned int element_cnt = 0;
 	char buffer[ONE_LINE_MAX_LEN] = {0};
 	char command[ONE_LINE_MAX_LEN] = {0};
 	char *rest = NULL;
@@ -396,29 +439,7 @@ skip_seperator:
 				parser->total_found_cnt++;
 			}
 
-			for (i = 0; i < (int)strlen(token); i++) {
-				if ((token[i] >= 0x30 && token[i] <= 0x39) || (token[i] == '-')) {
-					starting_pos = i;
-					break;
-				}
-			}
-
-			ending_pos = strlen(token);
-			for (i = strlen(token) - 1; i >= 0; i--) {
-				if ((token[i] >= 0x30 && token[i] <= 0x39) || (token[i] == '-')) {
-					ending_pos = i;
-					break;
-				}
-			}
-
-			if (starting_pos <= strlen(token) - 1 && ending_pos >= starting_pos) {
-				token[ending_pos + 1] = '\0';
-				value = strtol(&token[starting_pos], &ptr, 10);
-
-				if (ptr && strlen(ptr) > 0) {
-					continue;
-				}
-			}
+			value = take_clean_value(token);
 
 			if (parser->min_thres != LONG_MAX && value < parser->min_thres) {
 				continue;
@@ -462,7 +483,7 @@ skip_seperator:
 
 			if (parser->add_line_no) {
 				int len = strlen(temp);
-				snprintf(&temp[len - 1], sizeof(temp) - len, "\t%ld", parser->line_cnt);
+				snprintf(&temp[len], sizeof(temp) - len, "\t%ld", parser->line_cnt);
 			}
 
 			debugf("%s\n", temp);
