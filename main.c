@@ -31,6 +31,7 @@ struct parser
 {
 	bool add_line_no;
 	bool only_show_changes;
+	bool show_line;
 	unsigned int from;
 	unsigned int select;
 	unsigned int element_at;
@@ -72,6 +73,7 @@ static struct option parameters[] = {
 	{ "drawgraph",			required_argument,	0,		'g'		},
 	{ "startlineno",		required_argument,	0,		'i'		},
 	{ "endlineno",			required_argument,	0,		'j'		},
+	{ "showline",			no_argument,		0,		'q'		},
 	{ NULL,					0,					0,		0 		},
 };
 
@@ -100,6 +102,7 @@ static void print_help_exit (const char *name)
 	debugf("\t%s--drawgraph%s       \t(-g): draw graph\n\t\tcreates graph from the extracted data\n\t\tuseful when to visualize the data\n\t\trequires argument which is file path for newly created image\n\t\tnumerictype arg is used by default with this filter\n\n", ANSI_COLOR_BLUE, ANSI_COLOR_RESET);
 	debugf("\t%s--startlineno%s     \t(-i): show results after the line given as argument\n\n", ANSI_COLOR_BLUE, ANSI_COLOR_RESET);
 	debugf("\t%s--endlineno%s       \t(-j): show results before the line given as argument\n\n", ANSI_COLOR_BLUE, ANSI_COLOR_RESET);
+	debugf("\t%s--showline%s        \t(-q): show directly the lines that contains kewords. Other filters cannot be used\n\n", ANSI_COLOR_BLUE, ANSI_COLOR_RESET);
 
 	debugf("\n");
 
@@ -394,6 +397,11 @@ static int extract_data(struct parser *parser)
 		buffer[strcspn(buffer, "\n")] = 0;
 
 		if (contains_necessary_keywords(parser, buffer) == OK) {
+			if (parser->show_line) {
+				debugf("%s", buffer);
+				continue;
+			}
+
 			element_cnt = 0;
 
 			if (parser->line_below != 0) {
@@ -495,16 +503,20 @@ skip_seperator:
 out:
 	FCLOSE(parser->fp);
 
-	errorf("\n**********************************************************\n");
-	errorf("TOTAL PROGRESSED LINES: %ld\n", parser->line_cnt);
-	errorf("TOTAL EXTRACTED LINES: %ld\n", parser->total_found_cnt);
-	errorf("TOTAL SHOWED LINES: %ld\n", parser->total_showed_cnt);
-	errorf("MAX: %ld\tMIN: %ld\n", parser->max_value, parser->min_value);
-	errorf("\n**********************************************************\n");
+	if (!parser->show_line) {
+		errorf("\n**********************************************************\n");
+		errorf("TOTAL PROGRESSED LINES: %ld\n", parser->line_cnt);
+		errorf("TOTAL EXTRACTED LINES: %ld\n", parser->total_found_cnt);
+		errorf("TOTAL SHOWED LINES: %ld\n", parser->total_showed_cnt);
+		if (parser->max_value != LONG_MIN || parser->min_value != LONG_MAX) {
+			errorf("MAX: %ld\tMIN: %ld\n", parser->max_value, parser->min_value);
+		}
+		errorf("\n**********************************************************\n");
 
-	if (parser->image_file_path) {
-		if (create_image(parser, parser->max_value, parser->min_value) == NOK) {
-			errorf("create_image() failed\n");
+		if (parser->image_file_path) {
+			if (create_image(parser, parser->max_value, parser->min_value) == NOK) {
+				errorf("create_image() failed\n");
+			}
 		}
 	}
 
@@ -533,6 +545,7 @@ static void init_parser(struct parser *parser)
 	parser->min_value = LONG_MAX;
 	parser->start_lineno = UINT_MAX;
 	parser->end_lineno = UINT_MAX;
+	parser->show_line = false;
 
 }
 
@@ -552,16 +565,20 @@ static void deinit_parser(struct parser *parser)
 
 static void sigint_handler(__attribute__((unused)) int sig_num)
 {
+	if (!parser.show_line) {
+		errorf("\n**********************************************************\n");
+		errorf("TOTAL PROGRESSED LINES: %ld\n", parser.line_cnt);
+		errorf("TOTAL EXTRACTED LINES: %ld\n", parser.total_found_cnt);
+		errorf("TOTAL SHOWED LINES: %ld\n", (parser.total_found_cnt / parser.from));
+		if (parser.max_value != LONG_MIN || parser.min_value != LONG_MAX) {
+			errorf("MAX: %ld\tMIN: %ld\n", parser.max_value, parser.min_value);
+		}
+		errorf("\n**********************************************************\n");
+	}
+
 	destroy_keyword_list_list(&parser);
 	destroy_data_list(&parser);
 	deinit_parser(&parser);
-
-	errorf("\n**********************************************************\n");
-	errorf("TOTAL PROGRESSED LINES: %ld\n", parser.line_cnt);
-	errorf("TOTAL EXTRACTED LINES: %ld\n", parser.total_found_cnt);
-	errorf("TOTAL SHOWED LINES: %ld\n", (parser.total_found_cnt / parser.from));
-	errorf("MAX: %ld\tMIN: %ld\n", parser.max_value, parser.min_value);
-	errorf("\n**********************************************************\n");
 
 	exit(NOK);
 }
@@ -577,7 +594,7 @@ int main(int argc, char **argv)
 
 	init_parser(&parser);
 
-	while ((c = getopt_long(argc, argv, "hnlcvf:k:s:e:b:t:r:x:m:g:", parameters, &o)) != -1) {
+	while ((c = getopt_long(argc, argv, "hnlcvqf:k:s:e:b:t:r:x:m:g:", parameters, &o)) != -1) {
 		switch (c) {
 			case 'f':
 				parser.file_path = strdup(optarg);
@@ -694,6 +711,9 @@ int main(int argc, char **argv)
 					errorf("unknown arg content: %s\n", ptr);
 					return NOK;
 				}
+				break;
+			case 'q':
+				parser.show_line = true;
 				break;
 			default:
 				errorf("unknown argument\n");
