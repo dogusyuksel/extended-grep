@@ -49,6 +49,7 @@ struct parser
 	char *file_path;
 	char *image_file_path;
 	char seperator[2];
+	char commandline[ONE_LINE_MAX_LEN];
 	FILE *fp;
 	struct tailq keyword_list_tq;
 	struct image_data_tailq image_data_tailq;
@@ -227,9 +228,11 @@ static void data_mapping_process(struct image_data_tailq *image_data_tailq, long
 static int create_image(struct parser *parser, long max_val, long min_val)
 {
 	FILE *pgmimg = NULL;
+	FILE *commandfp = NULL;
 	int i = 0, j = 0;
 	long total_data = 0;
 	char filepath[ONE_LINE_MAX_LEN] = {0};
+	char commandpath[ONE_LINE_MAX_LEN] = {0};
 	struct image_data_entry *entry = NULL;
 	int image_height = IMAGE_HEIGHT;
 	struct entry *kw_entry = NULL;
@@ -250,21 +253,30 @@ static int create_image(struct parser *parser, long max_val, long min_val)
 
 	image_height = (int)((double)image_height * 1.2);
 
-	snprintf(filepath, ONE_LINE_MAX_LEN, "%s/", parser->image_file_path);
+	snprintf(filepath, sizeof(filepath), "%s/", parser->image_file_path);
 
 	TAILQ_FOREACH(kw_entry, &(parser->keyword_list_tq), entries) {
 		if (kw_entry->word) {
-			strncat(filepath, kw_entry->word, ONE_LINE_MAX_LEN - strlen(filepath));
-			strncat(filepath, "-", ONE_LINE_MAX_LEN - strlen(filepath));
+			strncat(filepath, kw_entry->word, sizeof(filepath) - strlen(filepath));
+			strncat(filepath, "-", sizeof(filepath) - strlen(filepath));
 		}
 	}
-	strncat(filepath, IMAGE_NAME, ONE_LINE_MAX_LEN - strlen(filepath));
+	strcpy(commandpath, filepath);
+	strncat(commandpath, ".txt", sizeof(commandpath) - strlen(filepath));
+	strncat(filepath, IMAGE_NAME, sizeof(filepath) - strlen(filepath));
 
 	pgmimg = fopen(filepath, "wb");
 	if (!pgmimg) {
-		errorf("fopen failed\n");
+		errorf("fopen failed filepath: %s\n", filepath);
 		return NOK;
 	}
+	commandfp = fopen(commandpath, "w+");
+	if (!commandfp) {
+		errorf("fopen failed filepath: %s\n", filepath);
+		return NOK;
+	}
+
+	fprintf(commandfp, "%s", parser->commandline);
 
 	fprintf(pgmimg, "P2\n");
 	fprintf(pgmimg, "%d %d\n", (int)(total_data * (EMPTY_WIDTH + PIXEL_WIDTH)), (int)image_height);
@@ -286,6 +298,7 @@ static int create_image(struct parser *parser, long max_val, long min_val)
 	}
 
 	fclose(pgmimg);
+	fclose(commandfp);
 
 	return OK;
 }
@@ -546,7 +559,7 @@ static void init_parser(struct parser *parser)
 	parser->start_lineno = UINT_MAX;
 	parser->end_lineno = UINT_MAX;
 	parser->show_line = false;
-
+	memset(parser->commandline, 0, sizeof(parser->commandline));
 }
 
 static void deinit_parser(struct parser *parser)
@@ -586,13 +599,17 @@ static void sigint_handler(__attribute__((unused)) int sig_num)
 int main(int argc, char **argv)
 {
 	int ret = OK;
-	int c;
-	int o;
+	int c, o, i;
 	char *ptr = NULL;
 
 	signal(SIGINT, sigint_handler);
 
 	init_parser(&parser);
+
+	for (i = 0; i < argc; i++) {
+		strncat(parser.commandline, argv[i], sizeof(parser.commandline) - strlen(parser.commandline));
+		strncat(parser.commandline, " ", sizeof(parser.commandline) - strlen(parser.commandline));
+	}
 
 	while ((c = getopt_long(argc, argv, "hnlcvqf:k:s:e:b:t:r:x:m:g:", parameters, &o)) != -1) {
 		switch (c) {
