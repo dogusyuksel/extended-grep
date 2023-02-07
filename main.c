@@ -611,7 +611,7 @@ int main(int argc, char **argv)
 		strncat(parser.commandline, " ", sizeof(parser.commandline) - strlen(parser.commandline));
 	}
 
-	while ((c = getopt_long(argc, argv, "hnlcvqf:k:s:e:b:t:r:x:m:g:", parameters, &o)) != -1) {
+	while ((c = getopt_long(argc, argv, "hnlcvqf:k:s:e:b:t:r:x:m:g:i:j:", parameters, &o)) != -1) {
 		switch (c) {
 			case 'f':
 				parser.file_path = strdup(optarg);
