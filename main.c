@@ -372,6 +372,33 @@ static long take_clean_value(char *token)
 	return value;
 }
 
+static int fgets_custom(char *s, int n, FILE *stream)
+{
+	int read = EOF;
+	int read_count = 0;
+
+	if (!s || !n || !stream) {
+		return NOK;
+	}
+
+	while(true) {
+		read = fgetc(stream);
+		if (read == EOF) {
+			return NOK;
+		}
+		if (read_count >= n || (char)read == '\n') {
+			break;
+		}
+		if ((char)read < ' ' || (char)read > '~') {
+			continue;
+		}
+		s[read_count++] = (char)read;
+	}
+
+	s[read_count] = 0;
+	return OK;
+}
+
 static int extract_data(struct parser *parser)
 {
 	unsigned int element_cnt = 0;
@@ -401,17 +428,17 @@ static int extract_data(struct parser *parser)
 	memset(buffer, 0, sizeof(buffer));
 	memset(command, 0, sizeof(command));
 
-	while (fgets(buffer, sizeof(buffer) - 1, parser->fp))
+	while (fgets_custom(buffer, sizeof(buffer) - 1, parser->fp) == OK)
 	{
 		memset(temp, 0, sizeof(temp));
 
-		++parser->line_cnt;
-
 		buffer[strcspn(buffer, "\n")] = 0;
+
+		++parser->line_cnt;
 
 		if (contains_necessary_keywords(parser, buffer) == OK) {
 			if (parser->show_line) {
-				debugf("%s", buffer);
+				debugf("%s\n", buffer);
 				continue;
 			}
 
