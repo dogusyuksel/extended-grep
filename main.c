@@ -257,13 +257,13 @@ static int create_image(struct parser *parser, long max_val, long min_val)
 
 	TAILQ_FOREACH(kw_entry, &(parser->keyword_list_tq), entries) {
 		if (kw_entry->word) {
-			strncat(filepath, kw_entry->word, sizeof(filepath) - strlen(filepath));
-			strncat(filepath, "-", sizeof(filepath) - strlen(filepath));
+			strncat(filepath, kw_entry->word, sizeof(filepath) - strlen(filepath) - 1);
+			strncat(filepath, "-", sizeof(filepath) - strlen(filepath) - 1);
 		}
 	}
 	strcpy(commandpath, filepath);
-	strncat(commandpath, ".txt", sizeof(commandpath) - strlen(filepath));
-	strncat(filepath, IMAGE_NAME, sizeof(filepath) - strlen(filepath));
+	strncat(commandpath, ".txt", sizeof(commandpath) - strlen(filepath) - 1);
+	strncat(filepath, IMAGE_NAME, sizeof(filepath) - strlen(filepath) -1);
 
 	pgmimg = fopen(filepath, "wb");
 	if (!pgmimg) {
@@ -634,8 +634,8 @@ int main(int argc, char **argv)
 	init_parser(&parser);
 
 	for (i = 0; i < argc; i++) {
-		strncat(parser.commandline, argv[i], sizeof(parser.commandline) - strlen(parser.commandline));
-		strncat(parser.commandline, " ", sizeof(parser.commandline) - strlen(parser.commandline));
+		strncat(parser.commandline, argv[i], sizeof(parser.commandline) - strlen(parser.commandline) - 1);
+		strncat(parser.commandline, " ", sizeof(parser.commandline) - strlen(parser.commandline) - 1);
 	}
 
 	while ((c = getopt_long(argc, argv, "hnlcvqf:k:s:e:b:t:r:x:m:g:i:j:", parameters, &o)) != -1) {

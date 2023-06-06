@@ -1,7 +1,7 @@
 
 CC = gcc
 RM = rm -rf
-CFLAGS = -Wall -Wextra -Werror -g3 -O0
+CFLAGS = -Werror -g3 -O0
 TARGET_EXECUTABLE_NAME=egrep
 
 SUBDIRS = 
