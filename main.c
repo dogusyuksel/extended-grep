@@ -107,7 +107,7 @@ static void print_help_exit (const char *name)
 	debugf("\t%s--drawgraph%s       \t(-g): draw graph\n\t\tcreates graph from the extracted data\n\t\tuseful when to visualize the data\n\t\tnewly created image can be seen on current dir\n\n", ANSI_COLOR_BLUE, ANSI_COLOR_RESET);
 	debugf("\t%s--startlineno%s     \t(-i): show results after the line given as argument\n\n", ANSI_COLOR_BLUE, ANSI_COLOR_RESET);
 	debugf("\t%s--endlineno%s       \t(-j): show results before the line given as argument\n\n", ANSI_COLOR_BLUE, ANSI_COLOR_RESET);
-	debugf("\t%s--showline%s        \t(-q): show directly the lines that contains kewords. Other filters cannot be used\n\n", ANSI_COLOR_BLUE, ANSI_COLOR_RESET);
+	debugf("\t%s--showline%s        \t(-q): show directly the lines that contains kewords. Other filters cannot be used except 'startlineno' and 'endlineno'\n\n", ANSI_COLOR_BLUE, ANSI_COLOR_RESET);
 
 	debugf("\n");
 
@@ -437,10 +437,20 @@ static int extract_data(struct parser *parser)
 					++parser->line_cnt;
 				}
 			}
+
+			if (parser->start_lineno != UINT_MAX && parser->line_cnt < parser->start_lineno) {
+				continue;
+			}
+
+			if (parser->end_lineno != UINT_MAX && parser->line_cnt > parser->end_lineno) {
+				continue;
+			}
+
 			if (parser->show_line) {
 				debugf("%s\n", buffer);
 				continue;
 			}
+
 			if (parser->element_at == UINT_MAX) {
 				token = buffer;
 				element_cnt++;
@@ -489,14 +499,6 @@ skip_seperator:
 			value_priv = value;
 
 			snprintf(temp, sizeof(temp), "%ld", value);
-
-			if (parser->start_lineno != UINT_MAX && parser->line_cnt < parser->start_lineno) {
-				continue;
-			}
-
-			if (parser->end_lineno != UINT_MAX && parser->line_cnt > parser->end_lineno) {
-				continue;
-			}
 
 			if (!((parser->total_found_cnt - 1) % parser->from == parser->select)) {
 				continue;
