@@ -573,9 +573,11 @@ out:
 		fputc('[', commandhistoryfs);
 		fputs(datetimestring, commandhistoryfs);
 		fputs("]\t", commandhistoryfs);
-		fputc('[', commandhistoryfs);
-		fputs(parser->tag, commandhistoryfs);
-		fputs("]\t", commandhistoryfs);
+		if (parser->tag) {
+			fputc('[', commandhistoryfs);
+			fputs(parser->tag, commandhistoryfs);
+			fputs("]\t", commandhistoryfs);
+		}
 		fputs(parser->commandline, commandhistoryfs);
 		fclose(commandhistoryfs);
 	}
