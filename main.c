@@ -10,6 +10,9 @@
 #include <sys/queue.h>
 #include <limits.h>
 #include <math.h>
+#include <time.h>
+#include <sys/stat.h>
+#include <libgen.h>
 
 #include "main.h"
 
@@ -32,6 +35,7 @@ struct parser
 	bool add_line_no;
 	bool only_show_changes;
 	bool show_line;
+	bool image_created;
 	unsigned int from;
 	unsigned int select;
 	unsigned int element_at;
@@ -47,7 +51,7 @@ struct parser
 	long min_value;
 	char *keyword_list;
 	char *file_path;
-	char *image_file_path;
+	char *dname;
 	char seperator[2];
 	char commandline[ONE_LINE_MAX_LEN];
 	FILE *fp;
@@ -71,7 +75,7 @@ static struct option parameters[] = {
 	{ "maxthres",			required_argument,	0,		'x'		},
 	{ "minthres",			required_argument,	0,		'm'		},
 	{ "version",			no_argument,		0,		'v'		},
-	{ "drawgraph",			required_argument,	0,		'g'		},
+	{ "drawgraph",			no_argument,		0,		'g'		},
 	{ "startlineno",		required_argument,	0,		'i'		},
 	{ "endlineno",			required_argument,	0,		'j'		},
 	{ "showline",			no_argument,		0,		'q'		},
@@ -95,12 +99,12 @@ static void print_help_exit (const char *name)
 	debugf("\t%s--linebelow%s       \t(-b): line below\n\t\tused to select a new line that is number of lines below the picket line before\n\t\tThis is usefull when there is no constant string specifier to pick the line that we want to examine\n\n", ANSI_COLOR_BLUE, ANSI_COLOR_RESET);
 	debugf("\t%s--showlineno%s      \t(-l): add line no\n\t\tused to specify real line no in the log doc in the new generated file\n\t\tNo parameter required\n\n", ANSI_COLOR_BLUE, ANSI_COLOR_RESET);
 	debugf("\t%s--onlyshowchanges%s \t(-c): show only changes\n\t\tused to parameter changes, like \"watch\" property\n\t\tNo parameter required\n\n", ANSI_COLOR_BLUE, ANSI_COLOR_RESET);
-	debugf("\t%s--maxthres%s        \t(-x): max threshold\n\t\tused to filter numeric values\n\t\tnumerictype arg is used by default with this filter\n\n", ANSI_COLOR_BLUE, ANSI_COLOR_RESET);
-	debugf("\t%s--minthres%s        \t(-m): min threshold\n\t\tused to filter numeric values\n\t\tnumerictype arg is used by default with this filter\n\n", ANSI_COLOR_BLUE, ANSI_COLOR_RESET);
+	debugf("\t%s--maxthres%s        \t(-x): max threshold\n\t\tused to filter numeric values\n\n", ANSI_COLOR_BLUE, ANSI_COLOR_RESET);
+	debugf("\t%s--minthres%s        \t(-m): min threshold\n\t\tused to filter numeric values\n\n", ANSI_COLOR_BLUE, ANSI_COLOR_RESET);
 	debugf("\t%s--select%s          \t(-t): select\n\t\tused to pick \"select-th\" line from \"from\" lines\n\t\tfrom arg is must\n\t\tusefull to remove duplicated log lines\n\n", ANSI_COLOR_BLUE, ANSI_COLOR_RESET);
 	debugf("\t%s--from%s            \t(-r): from\n\t\tused to pick \"select-th\" line from \"from\" lines\n\t\tselect arg is must\n\t\tusefull to remove duplicated log lines\n\n", ANSI_COLOR_BLUE, ANSI_COLOR_RESET);
 	debugf("\t%s--version%s         \t(-v): show version\n\n", ANSI_COLOR_BLUE, ANSI_COLOR_RESET);
-	debugf("\t%s--drawgraph%s       \t(-g): draw graph\n\t\tcreates graph from the extracted data\n\t\tuseful when to visualize the data\n\t\trequires argument which is file path for newly created image\n\t\tnumerictype arg is used by default with this filter\n\n", ANSI_COLOR_BLUE, ANSI_COLOR_RESET);
+	debugf("\t%s--drawgraph%s       \t(-g): draw graph\n\t\tcreates graph from the extracted data\n\t\tuseful when to visualize the data\n\t\tnewly created image can be seen on current dir\n\n", ANSI_COLOR_BLUE, ANSI_COLOR_RESET);
 	debugf("\t%s--startlineno%s     \t(-i): show results after the line given as argument\n\n", ANSI_COLOR_BLUE, ANSI_COLOR_RESET);
 	debugf("\t%s--endlineno%s       \t(-j): show results before the line given as argument\n\n", ANSI_COLOR_BLUE, ANSI_COLOR_RESET);
 	debugf("\t%s--showline%s        \t(-q): show directly the lines that contains kewords. Other filters cannot be used\n\n", ANSI_COLOR_BLUE, ANSI_COLOR_RESET);
@@ -225,21 +229,19 @@ static void data_mapping_process(struct image_data_tailq *image_data_tailq, long
 	*total_data = i;
 }
 
-static int create_image(struct parser *parser, long max_val, long min_val)
+static int create_image(struct parser *parser, long max_val, long min_val, char *datetimestring)
 {
 	FILE *pgmimg = NULL;
-	FILE *commandfp = NULL;
 	int i = 0, j = 0;
 	long total_data = 0;
 	char filepath[ONE_LINE_MAX_LEN] = {0};
-	char commandpath[ONE_LINE_MAX_LEN] = {0};
 	struct image_data_entry *entry = NULL;
 	int image_height = IMAGE_HEIGHT;
 	struct entry *kw_entry = NULL;
 
 	UNUSED(min_val);
 
-	if (!parser) {
+	if (!parser || !datetimestring) {
 		errorf("arg is NULL\n");
 		return NOK;
 	}
@@ -253,30 +255,13 @@ static int create_image(struct parser *parser, long max_val, long min_val)
 
 	image_height = (int)((double)image_height * 1.2);
 
-	snprintf(filepath, sizeof(filepath), "%s/", parser->image_file_path);
-
-	TAILQ_FOREACH(kw_entry, &(parser->keyword_list_tq), entries) {
-		if (kw_entry->word) {
-			strncat(filepath, kw_entry->word, sizeof(filepath) - strlen(filepath) - 1);
-			strncat(filepath, "-", sizeof(filepath) - strlen(filepath) - 1);
-		}
-	}
-	strcpy(commandpath, filepath);
-	strncat(commandpath, ".txt", sizeof(commandpath) - strlen(filepath) - 1);
-	strncat(filepath, IMAGE_NAME, sizeof(filepath) - strlen(filepath) -1);
+	snprintf(filepath, sizeof(filepath), "%s/%s.pgm", parser->dname, datetimestring);
 
 	pgmimg = fopen(filepath, "wb");
 	if (!pgmimg) {
 		errorf("fopen failed filepath: %s\n", filepath);
 		return NOK;
 	}
-	commandfp = fopen(commandpath, "w+");
-	if (!commandfp) {
-		errorf("fopen failed filepath: %s\n", filepath);
-		return NOK;
-	}
-
-	fprintf(commandfp, "%s", parser->commandline);
 
 	fprintf(pgmimg, "P2\n");
 	fprintf(pgmimg, "%d %d\n", (int)(total_data * (EMPTY_WIDTH + PIXEL_WIDTH)), (int)image_height);
@@ -298,7 +283,6 @@ static int create_image(struct parser *parser, long max_val, long min_val)
 	}
 
 	fclose(pgmimg);
-	fclose(commandfp);
 
 	return OK;
 }
@@ -349,7 +333,7 @@ static long take_clean_value(char *token)
 		}
 	}
 
-	ending_pos = strlen(dup_token);
+	ending_pos = strlen(dup_token) - 1;
 	for (i = strlen(dup_token) - 1; i >= 0; i--) {
 		if ((dup_token[i] >= 0x30 && dup_token[i] <= 0x39) || (dup_token[i] == '-')) {
 			ending_pos = i;
@@ -357,7 +341,7 @@ static long take_clean_value(char *token)
 		}
 	}
 
-	if (starting_pos < strlen(dup_token) && ending_pos >= starting_pos) {
+	if (starting_pos < strlen(dup_token) && ending_pos > starting_pos) {
 		dup_token[ending_pos + 1] = '\0';
 		value = strtol(&dup_token[starting_pos], &ptr, 10);
 
@@ -403,12 +387,16 @@ static int extract_data(struct parser *parser)
 {
 	unsigned int element_cnt = 0;
 	char buffer[ONE_LINE_MAX_LEN] = {0};
-	char command[ONE_LINE_MAX_LEN] = {0};
 	char *rest = NULL;
-    char *token;
+	char *token = NULL;
 	char temp[ONE_LINE_MAX_LEN] = {0};
+	char datetimestring[ONE_LINE_MAX_LEN] = {0};
+	char commandhistorypath[ONE_LINE_MAX_LEN] = {0};
 	long value_priv = 0;
 	long value = 0;
+	struct timespec ts;
+	struct tm *brokentime = NULL;
+	FILE *commandhistoryfs = NULL;
 
 	if (!parser) {
 		errorf("wrong prm\n");
@@ -421,15 +409,13 @@ static int extract_data(struct parser *parser)
 		return NOK;
 	}
 
-	if (parser->image_file_path) {
+	if (parser->image_created) {
 		TAILQ_INIT(&(parser->image_data_tailq));
 	}
 
 	memset(buffer, 0, sizeof(buffer));
-	memset(command, 0, sizeof(command));
 
-	while (fgets_custom(buffer, sizeof(buffer) - 1, parser->fp) == OK)
-	{
+	while (fgets_custom(buffer, sizeof(buffer) - 1, parser->fp) == OK) {
 		memset(temp, 0, sizeof(temp));
 
 		buffer[strcspn(buffer, "\n")] = 0;
@@ -437,23 +423,23 @@ static int extract_data(struct parser *parser)
 		++parser->line_cnt;
 
 		if (contains_necessary_keywords(parser, buffer) == OK) {
-			if (parser->show_line) {
-				debugf("%s\n", buffer);
-				continue;
-			}
-
 			element_cnt = 0;
 
 			if (parser->line_below != 0) {
 				unsigned int i = 0;
 
 				for (i = 0; i < parser->line_below; i++) {
-					if (!fgets(buffer, sizeof(buffer) - 1, parser->fp)) {
+					memset(buffer, 0, sizeof(buffer));
+					if (fgets_custom(buffer, sizeof(buffer) - 1, parser->fp) != OK) {
 						errorf("fget fails\n");
 						goto out;
 					}
 					++parser->line_cnt;
 				}
+			}
+			if (parser->show_line) {
+				debugf("%s\n", buffer);
+				continue;
 			}
 			if (parser->element_at == UINT_MAX) {
 				token = buffer;
@@ -523,7 +509,7 @@ skip_seperator:
 				parser->min_value = value;
 			}
 
-			if (parser->image_file_path) {
+			if (parser->image_created) {
 				if (insert_data_to_data_queue(value, &(parser->image_data_tailq)) == NOK) {
 					errorf("insert failed\n");
 				}
@@ -553,11 +539,35 @@ out:
 		}
 		errorf("\n**********************************************************\n");
 
-		if (parser->image_file_path) {
-			if (create_image(parser, parser->max_value, parser->min_value) == NOK) {
+
+		if (clock_gettime(CLOCK_REALTIME, &ts) == -1) {
+			errorf("clock_gettime");
+			return NOK;
+		}
+		brokentime = localtime(&(ts.tv_sec));
+
+		if(strftime(datetimestring, sizeof(datetimestring), "%Y-%m-%d %H:%M:%S", brokentime) == 0) {
+			errorf("strftime failed\n");
+			return NOK;
+		}
+
+		if (parser->image_created) {
+			if (create_image(parser, parser->max_value, parser->min_value, datetimestring) == NOK) {
 				errorf("create_image() failed\n");
 			}
 		}
+
+		snprintf(commandhistorypath, sizeof(commandhistorypath), "%s/%s", parser->dname, COMMAND_HISTORY);
+		commandhistoryfs = fopen(commandhistorypath, "a+");
+		if (!commandhistoryfs) {
+			errorf("fopen failed\n");
+			return NOK;
+		}
+		fputc('[', commandhistoryfs);
+		fputs(datetimestring, commandhistoryfs);
+		fputs("]\t", commandhistoryfs);
+		fputs(parser->commandline, commandhistoryfs);
+		fclose(commandhistoryfs);
 	}
 
 	return OK;
@@ -573,6 +583,7 @@ static void init_parser(struct parser *parser)
 	parser->fp = NULL;
 	parser->add_line_no = false;
 	parser->only_show_changes = false;
+	parser->image_created = false;
 	parser->select = 0;
 	parser->from = 1;
 	parser->line_below = 0;
@@ -597,8 +608,8 @@ static void deinit_parser(struct parser *parser)
 	}
 
 	FREE(parser->file_path);
+	FREE(parser->dname);
 	FREE(parser->keyword_list);
-	FREE(parser->image_file_path);
 
 	FCLOSE(parser->fp);
 }
@@ -628,6 +639,8 @@ int main(int argc, char **argv)
 	int ret = OK;
 	int c, o, i;
 	char *ptr = NULL;
+	char file_path_dup[ONE_LINE_MAX_LEN] = {0};
+	char file_dup_command[ONE_LINE_MAX_LEN] = {0};
 
 	signal(SIGINT, sigint_handler);
 
@@ -637,20 +650,27 @@ int main(int argc, char **argv)
 		strncat(parser.commandline, argv[i], sizeof(parser.commandline) - strlen(parser.commandline) - 1);
 		strncat(parser.commandline, " ", sizeof(parser.commandline) - strlen(parser.commandline) - 1);
 	}
+	strncat(parser.commandline, "\n", sizeof(parser.commandline) - strlen(parser.commandline) - 1);
 
-	while ((c = getopt_long(argc, argv, "hnlcvqf:k:s:e:b:t:r:x:m:g:i:j:", parameters, &o)) != -1) {
+	while ((c = getopt_long(argc, argv, "hnlcvqgf:k:s:e:b:t:r:x:m:i:j:", parameters, &o)) != -1) {
 		switch (c) {
 			case 'f':
-				parser.file_path = strdup(optarg);
-				if (!parser.file_path) {
+				snprintf(file_path_dup, sizeof(file_path_dup), "%s.dup", optarg);
+				parser.file_path = strdup(file_path_dup);
+				parser.dname = strdup(optarg);
+				if (!parser.file_path || !parser.dname) {
 					errorf("strdup failed\n");
 					return NOK;
 				}
 
-				if (!parser.file_path || !strlen(parser.file_path)) {
+				dirname(parser.dname);
+				if (!strlen(parser.file_path) || !strlen(parser.dname)) {
 					errorf("file_path seems wrong\n");
 					return NOK;
 				}
+
+				snprintf(file_dup_command, sizeof(file_path_dup), "cp -f %s %s", optarg, parser.file_path);
+				system(file_dup_command);
 				break;
 			case 'h':
 				print_help_exit(argv[0]);
@@ -729,16 +749,7 @@ int main(int argc, char **argv)
 				errorf("\n%s - ver: %s\n", argv[0], VERSION);
 				return OK;
 			case 'g':
-				parser.image_file_path = strdup(optarg);
-				if (!parser.image_file_path) {
-					errorf("strdup failed\n");
-					return NOK;
-				}
-
-				if (!parser.image_file_path || !strlen(parser.image_file_path)) {
-					errorf("image_file_path seems wrong\n");
-					return NOK;
-				}
+				parser.image_created = true;
 				break;
 			case 'i':
 				parser.start_lineno = strtoul(optarg, &ptr, 10);

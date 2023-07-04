@@ -21,7 +21,7 @@
 #define ANSI_COLOR_CYAN    "\x1b[36m"
 #define ANSI_COLOR_RESET   "\x1b[0m"
 
-#define IMAGE_NAME		"created_graph.pgm"
+#define COMMAND_HISTORY	"command_history.txt"
 #define PIXEL_WIDTH		5
 #define EMPTY_WIDTH		2
 #define IMAGE_HEIGHT	2048
