@@ -6,7 +6,7 @@
 #include <stdbool.h>
 #include <stdarg.h>
 
-#define VERSION		"00.01"
+#define VERSION		"00.02"
 
 #define OK			0
 #define NOK			1

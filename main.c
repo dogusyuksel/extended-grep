@@ -52,6 +52,7 @@ struct parser
 	char *keyword_list;
 	char *file_path;
 	char *dname;
+	char *tag;
 	char seperator[2];
 	char commandline[ONE_LINE_MAX_LEN];
 	FILE *fp;
@@ -79,6 +80,7 @@ static struct option parameters[] = {
 	{ "startlineno",		required_argument,	0,		'i'		},
 	{ "endlineno",			required_argument,	0,		'j'		},
 	{ "showline",			no_argument,		0,		'q'		},
+	{ "tag",				required_argument,	0,		'a'		},
 	{ NULL,					0,					0,		0 		},
 };
 
@@ -108,6 +110,7 @@ static void print_help_exit (const char *name)
 	debugf("\t%s--startlineno%s     \t(-i): show results after the line given as argument\n\n", ANSI_COLOR_BLUE, ANSI_COLOR_RESET);
 	debugf("\t%s--endlineno%s       \t(-j): show results before the line given as argument\n\n", ANSI_COLOR_BLUE, ANSI_COLOR_RESET);
 	debugf("\t%s--showline%s        \t(-q): show directly the lines that contains kewords. Other filters cannot be used except 'startlineno' and 'endlineno'\n\n", ANSI_COLOR_BLUE, ANSI_COLOR_RESET);
+	debugf("\t%s--tag%s             \t(-a): TAG the line saved in command history database\n\n", ANSI_COLOR_BLUE, ANSI_COLOR_RESET);
 
 	debugf("\n");
 
@@ -255,7 +258,8 @@ static int create_image(struct parser *parser, long max_val, long min_val, char 
 
 	image_height = (int)((double)image_height * 1.2);
 
-	snprintf(filepath, sizeof(filepath), "%s/%s.pgm", parser->dname, datetimestring);
+	snprintf(filepath, sizeof(filepath), "%s/%s%s%s.pgm",
+		parser->dname, (!parser->tag) ? "" : parser->tag, (!parser->tag) ? "" : "-", datetimestring);
 
 	pgmimg = fopen(filepath, "wb");
 	if (!pgmimg) {
@@ -333,15 +337,15 @@ static long take_clean_value(char *token)
 		}
 	}
 
-	ending_pos = strlen(dup_token) - 1;
-	for (i = strlen(dup_token) - 1; i >= 0; i--) {
-		if ((dup_token[i] >= 0x30 && dup_token[i] <= 0x39) || (dup_token[i] == '-')) {
-			ending_pos = i;
+	for (i = 0; i < (int)strlen(dup_token); i++) {
+		if (!(dup_token[i] >= 0x30 && dup_token[i] <= 0x39) || (dup_token[i] == '-') &&
+			i >= 1) {
+			ending_pos = i - 1;
 			break;
 		}
 	}
 
-	if (starting_pos < strlen(dup_token) && ending_pos > starting_pos) {
+	if (starting_pos < strlen(dup_token) && ending_pos >= starting_pos) {
 		dup_token[ending_pos + 1] = '\0';
 		value = strtol(&dup_token[starting_pos], &ptr, 10);
 
@@ -568,6 +572,9 @@ out:
 		fputc('[', commandhistoryfs);
 		fputs(datetimestring, commandhistoryfs);
 		fputs("]\t", commandhistoryfs);
+		fputc('[', commandhistoryfs);
+		fputs(parser->tag, commandhistoryfs);
+		fputs("]\t", commandhistoryfs);
 		fputs(parser->commandline, commandhistoryfs);
 		fclose(commandhistoryfs);
 	}
@@ -611,6 +618,7 @@ static void deinit_parser(struct parser *parser)
 
 	FREE(parser->file_path);
 	FREE(parser->dname);
+	FREE(parser->tag);
 	FREE(parser->keyword_list);
 
 	FCLOSE(parser->fp);
@@ -654,7 +662,7 @@ int main(int argc, char **argv)
 	}
 	strncat(parser.commandline, "\n", sizeof(parser.commandline) - strlen(parser.commandline) - 1);
 
-	while ((c = getopt_long(argc, argv, "hnlcvqgf:k:s:e:b:t:r:x:m:i:j:", parameters, &o)) != -1) {
+	while ((c = getopt_long(argc, argv, "hnlcvqgf:k:s:e:b:t:r:x:m:i:j:a:", parameters, &o)) != -1) {
 		switch (c) {
 			case 'f':
 				snprintf(file_path_dup, sizeof(file_path_dup), "%s.dup", optarg);
@@ -680,6 +688,13 @@ int main(int argc, char **argv)
 			case 'k':
 				parser.keyword_list = strdup(optarg);
 				if (!parser.keyword_list) {
+					errorf("strdup failed\n");
+					return NOK;
+				}
+				break;
+			case 'a':
+				parser.tag = strdup(optarg);
+				if (!parser.tag) {
 					errorf("strdup failed\n");
 					return NOK;
 				}
