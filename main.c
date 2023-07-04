@@ -337,6 +337,7 @@ static long take_clean_value(char *token)
 		}
 	}
 
+	ending_pos = strlen(dup_token);
 	for (i = 0; i < (int)strlen(dup_token); i++) {
 		if (!(dup_token[i] >= 0x30 && dup_token[i] <= 0x39) || (dup_token[i] == '-') &&
 			i >= 1) {
