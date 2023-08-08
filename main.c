@@ -36,6 +36,7 @@ struct parser
 	bool only_show_changes;
 	bool show_line;
 	bool image_created;
+	bool take_as_string;
 	unsigned int from;
 	unsigned int select;
 	unsigned int element_at;
@@ -81,6 +82,7 @@ static struct option parameters[] = {
 	{ "endlineno",			required_argument,	0,		'j'		},
 	{ "showline",			no_argument,		0,		'q'		},
 	{ "tag",				required_argument,	0,		'a'		},
+	{ "takeasstring",		no_argument,		0,		'd'		},
 	{ NULL,					0,					0,		0 		},
 };
 
@@ -111,6 +113,7 @@ static void print_help_exit (const char *name)
 	debugf("\t%s--endlineno%s       \t(-j): show results before the line given as argument\n\n", ANSI_COLOR_BLUE, ANSI_COLOR_RESET);
 	debugf("\t%s--showline%s        \t(-q): show directly the lines that contains kewords. Other filters cannot be used except 'startlineno' and 'endlineno'\n\n", ANSI_COLOR_BLUE, ANSI_COLOR_RESET);
 	debugf("\t%s--tag%s             \t(-a): TAG the line saved in command history database\n\n", ANSI_COLOR_BLUE, ANSI_COLOR_RESET);
+	debugf("\t%s--takeasstring%s    \t(-d): for complex lines, the user could work and save some filtered result first, to rework on it later.\n\t\tSo this option can be used to threat the selected word as string\n\n", ANSI_COLOR_BLUE, ANSI_COLOR_RESET);
 
 	debugf("\n");
 
@@ -503,6 +506,11 @@ skip_seperator:
 
 			value_priv = value;
 
+
+			if (parser->take_as_string) {
+				snprintf(temp, sizeof(temp), "%s", token);
+				goto add_line_no;
+			}
 			snprintf(temp, sizeof(temp), "%ld", value);
 
 			if (!((parser->total_found_cnt - 1) % parser->from == parser->select)) {
@@ -522,6 +530,7 @@ skip_seperator:
 				}
 			}
 
+add_line_no:
 			if (parser->add_line_no) {
 				int len = strlen(temp);
 				snprintf(&temp[len], sizeof(temp) - len, "\t%ld", parser->line_cnt);
@@ -721,6 +730,9 @@ int main(int argc, char **argv)
 				break;
 			case 'l':
 				parser.add_line_no = true;
+				break;
+			case 'd':
+				parser.take_as_string = true;
 				break;
 			case 'c':
 				parser.only_show_changes = true;
