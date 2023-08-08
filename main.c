@@ -50,6 +50,7 @@ struct parser
 	long min_thres;
 	long max_value;
 	long min_value;
+	long base;
 	char *keyword_list;
 	char *file_path;
 	char *dname;
@@ -83,6 +84,7 @@ static struct option parameters[] = {
 	{ "showline",			no_argument,		0,		'q'		},
 	{ "tag",				required_argument,	0,		'a'		},
 	{ "takeasstring",		no_argument,		0,		'd'		},
+	{ "base",				required_argument,	0,		'n'		},
 	{ NULL,					0,					0,		0 		},
 };
 
@@ -114,6 +116,7 @@ static void print_help_exit (const char *name)
 	debugf("\t%s--showline%s        \t(-q): show directly the lines that contains kewords. Other filters cannot be used except 'startlineno' and 'endlineno'\n\n", ANSI_COLOR_BLUE, ANSI_COLOR_RESET);
 	debugf("\t%s--tag%s             \t(-a): TAG the line saved in command history database\n\n", ANSI_COLOR_BLUE, ANSI_COLOR_RESET);
 	debugf("\t%s--takeasstring%s    \t(-d): for complex lines, the user could work and save some filtered result first, to rework on it later.\n\t\tSo this option can be used to threat the selected word as string\n\n", ANSI_COLOR_BLUE, ANSI_COLOR_RESET);
+	debugf("\t%s--base%s            \t(-n): indicates filtered value's base. Eg: 10, 16 (for hex)\n\n", ANSI_COLOR_BLUE, ANSI_COLOR_RESET);
 
 	debugf("\n");
 
@@ -316,6 +319,64 @@ static int insert_data_to_data_queue(long data, struct image_data_tailq *image_d
 	return OK;
 }
 
+static long take_clean_value_hex(char *token)
+{
+	int i = 0;
+	long value = 0;
+	char *ptr = NULL;
+	unsigned int starting_pos = 0;
+	unsigned int ending_pos = 0;
+	char *dup_token = NULL;
+
+	if (!token) {
+		return 0;
+	}
+	if (strlen(token) > 2 && token[0] == '0' &&
+		(token[1] == 'x' || token[1] == 'X')) {
+		dup_token = strdup(&token[2]);
+	} else {
+		dup_token = strdup(token);
+	}
+	if (!dup_token) {
+		return 0;
+	}
+
+	for (i = 0; i < (int)strlen(dup_token); i++) {
+		if ((dup_token[i] >= 0x30 && dup_token[i] <= 0x39) ||
+			(dup_token[i] == '-') ||
+			(dup_token[i] >= 'a' && dup_token[i] <= 'f') ||
+			(dup_token[i] >= 'A' && dup_token[i] <= 'F')) {
+			starting_pos = i;
+			break;
+		}
+	}
+
+	ending_pos = strlen(dup_token);
+	for (i = 0; i < (int)strlen(dup_token); i++) {
+		if ((!(dup_token[i] >= 0x30 && dup_token[i] <= 0x39) &&
+			!(dup_token[i] >= 'a' && dup_token[i] <= 'f') &&
+			!(dup_token[i] >= 'A' && dup_token[i] <= 'F')) || (dup_token[i] == '-') &&
+			i >= 1) {
+			ending_pos = i - 1;
+			break;
+		}
+	}
+
+	if (starting_pos < strlen(dup_token) && ending_pos >= starting_pos) {
+		dup_token[ending_pos + 1] = '\0';
+		value = strtol(&dup_token[starting_pos], &ptr, 16);
+
+		if (ptr && strlen(ptr) > 0) {
+			FREE(dup_token);
+			return 0;
+		}
+	}
+
+	FREE(dup_token);
+
+	return value;
+}
+
 static long take_clean_value(char *token)
 {
 	int i = 0;
@@ -362,6 +423,23 @@ static long take_clean_value(char *token)
 	FREE(dup_token);
 
 	return value;
+}
+
+static long clean_value_mux(char *token, long base)
+{
+	switch (base)
+	{
+	case 10:
+		return take_clean_value(token);
+		break;
+	case 16:
+		return take_clean_value_hex(token);
+		break;
+	default:
+		break;
+	}
+
+	return 0;
 }
 
 static int fgets_custom(char *s, int n, FILE *stream)
@@ -490,8 +568,7 @@ skip_seperator:
 			if (element_cnt) {
 				parser->total_found_cnt++;
 			}
-
-			value = take_clean_value(token);
+			value = clean_value_mux(token, parser->base);
 
 			if (parser->min_thres != LONG_MAX && value < parser->min_thres) {
 				continue;
@@ -618,6 +695,7 @@ static void init_parser(struct parser *parser)
 	parser->start_lineno = UINT_MAX;
 	parser->end_lineno = UINT_MAX;
 	parser->show_line = false;
+	parser->base = 10;
 	memset(parser->commandline, 0, sizeof(parser->commandline));
 }
 
@@ -763,6 +841,14 @@ int main(int argc, char **argv)
 				break;
 			case 'x':
 				parser.max_thres = strtol(optarg, &ptr, 10);
+
+				if (ptr && strlen(ptr) > 0) {
+					errorf("unknown arg content: %s\n", ptr);
+					return NOK;
+				}
+				break;
+			case 'n':
+				parser.base = strtol(optarg, &ptr, 10);
 
 				if (ptr && strlen(ptr) > 0) {
 					errorf("unknown arg content: %s\n", ptr);
