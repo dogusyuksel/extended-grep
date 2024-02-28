@@ -124,9 +124,12 @@ Text at the bottom of help
 <h2 id="how-to-use"> How to Use</h2>
 
 1. Install an additional library for graph drawing
-> pip install matplotlib
-> pip install pytest
-2. Then, you may use the executable on "test.txt" sample file like below
+
+    pip install matplotlib
+
+    pip install pytest
+
+3. Then, you may use the executable on "test.txt" sample file like below
 > python3 egrep.py -f test.txt --keywords RX,errors --notkeysensitive --elementat 2 --typeint --drawgraph
 
 The above command's menaning is;
@@ -211,16 +214,6 @@ Here is the output graph view;
   <img src="pictures/created_graph_sample.png" width="140px" height="100px">
 </p>
 
-![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png)
-
-<!-- LIMITS -->
-<h2 id="limitations"> Limitations</h2>
-
-* PIXEL_WIDTH:      Used to determine one graph column's width
-* EMPTY_WIDTH:        Used to determine empty pixels between each graph column
-* IMAGE_HEIGHT:     Used to limit image height
-* IMAGE_MAX_WIDTH:  Used to limit image width
-* ONE_LINE_MAX_LEN: Used to limit one line lenght in the log file
 
 ![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png)
 
