@@ -17,7 +17,6 @@
     <li><a href="#folder-structure"> ➤ Folder Structure</a></li>
     <li><a href="#arguments-details"> ➤ Arguments Details</a></li>
     <li><a href="#how-to-use"> ➤ How to Use</a></li>
-    <li><a href="#limitations"> ➤ Limitations</a></li>
     <li><a href="#license"> ➤ License</a></li>
   </ol>
 </details>
@@ -39,7 +38,6 @@
   * seeing the line number of a line thatwe interested
   * for numeric values, we can filter the data with maximum/minimum threshold
   * we can filter the data to see only when it is changed
-  * we can also eleminate duplicates with "--select"/"--from" arguments
   * graphs can be drawn for numeric data to see the trends fast
 </p>
 
@@ -48,10 +46,8 @@
 <!-- PREREQUISITES -->
 <h2 id="prerequisites"> Prerequisites</h2>
 
-![C](https://img.shields.io/badge/c-%2300599C.svg?style=for-the-badge&logo=c&logoColor=white) <br>
-![Linux](https://img.shields.io/badge/Linux-FCC624?style=for-the-badge&logo=linux&logoColor=black) <br>
+![Python](https://img.shields.io/pypi/pyversions/3) <br>
 ![Ubuntu](https://img.shields.io/badge/Ubuntu-E95420?style=for-the-badge&logo=ubuntu&logoColor=white) <br>
-![CMake](https://img.shields.io/badge/CMake-064F8C?style=for-the-badge&logo=cmake&logoColor=white) <br>
 
 No third party packets used in this project.
 
@@ -65,81 +61,60 @@ No third party packets used in this project.
     │
     ├── pictures
     │   ├── egrep.png
+    │   ├── created_graph_sample.png
     │
     ├── LICENSE
-    ├── main.c  
-    ├── main.h    
-    ├── Makefile 
+    ├── egrep.py  
     ├── README.md
-    ├── test.log
+    ├── test.txt
 
 * pictures folder: contains pictures used in the README.md file.
 * LICENSE file: contains license information
-* main.c and main.h files: are source codes
-* Makefile: makefile to compile the program
+* egrep.py file: is the source code
 * README.md file: readme itselt
-* test.log file: a simple and sample log file to test the app quickly  
+* test.txt file: a simple and sample log file to test the app quickly  
 
 ![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png)
 
 <!-- ARGUMENTS -->
 <h2 id="arguments-details"> Arguments' Details</h2>
-<p>    
+<p>
 
-	--logfilepath     	(-f): log file path
-		used to specify the log file's directory path.
-		This is MANDATORY field
+    usage: ProgramName [-h] [-v] [-d] [-f FILENAME] [-s STARTLINE] [-e ENDLINE] [-l] [-k KEYWORDS] [-t] [-b LINEBELOW] [-p SEPERATOR] [-m ELEMENTAT] [-i] [-a BASE] [-x MAXTHRESHOLD] [-n MINTHRESHOLD] [-c] [-w]
+    
+    What the program does
+    
+    optional arguments:
+      -h, --help            show this help message and exit
+      -v, --version         show version number and return
+      -d, --verbose         verbosity setting
+      -f FILENAME, --filename FILENAME
+                            direct path to the log file
+      -s STARTLINE, --startline STARTLINE
+                            starting line to run the query while line numbering starts from 1 and the input numbered line will be included
+      -e ENDLINE, --endline ENDLINE
+                            ending line to run the query while the input numbered line will be included
+      -l, --showlineno      show line numbers
+      -k KEYWORDS, --keywords KEYWORDS
+                            direct path to the log file
+      -t, --notkeysensitive
+                            are include keywords key sensitive
+      -b LINEBELOW, --linebelow LINEBELOW
+                            select the number of lines below of the keywords containing line
+      -p SEPERATOR, --seperator SEPERATOR
+                            selected line will be splitted into words around this character, default is SPACE
+      -m ELEMENTAT, --elementat ELEMENTAT
+                            the number of i'th element in the line after splitting with respect to seperator, starting from 0
+      -i, --typeint         treat the parsed word is int, assumed string by default
+      -a BASE, --base BASE  base of the found word, eg: 16, default is 10
+      -x MAXTHRESHOLD, --maxthreshold MAXTHRESHOLD
+                            maximum threshold to be shown
+      -n MINTHRESHOLD, --minthreshold MINTHRESHOLD
+                            minimum threshold to be shown
+      -c, --showifchanged   shows the result only it is different than the previous
+      -w, --drawgraph       draw graph and save it to the current directory with name 'output.png'
 
-	--keywords        	(-k): keyword list
-		used to specify special keywords to pick a line. You can use multiple keywords seperated by comma without empty space.
-		This is MANDATORY field
-
-	--seperator       	(-ps): seperator
-		used to specify special character to split the picked line.
-		TAB is used if it is not set
-
-	--elementat       	(-e): element at
-		used to specify which element you want to extract after splitting the line.
-		If this is not used, then whole line will be filtered.
-
-	--linebelow       	(-b): line below
-		used to select a new line that is number of lines below the picket line before
-		This is usefull when there is no constant string specifier to pick the line that we want to examine
-
-	--showlineno      	(-l): add line no
-		used to specify real line no in the log doc in the new generated file
-		No parameter required
-
-	--onlyshowchanges 	(-c): show only changes
-		used to parameter changes, like "watch" property
-		No parameter required
-
-	--maxthres        	(-x): max threshold
-		used to filter numeric values
-
-	--minthres        	(-m): min threshold
-		used to filter numeric values
-
-	--select          	    : select
-		used to pick "select-th" line from "from" lines
-		from arg is must
-		usefull to remove duplicated log lines
-
-	--from            	    : from
-		used to pick "select-th" line from "from" lines
-		select arg is must
-		usefull to remove duplicated log lines
-
-	--version         	(-v): show version
-
-	--drawgraph       	(-g): draw graph
-		creates graph from the extracted data
-		useful when to visualize the data
-		requires argument which is file path for newly created image
-
-	--startlineno     	(-i): show results after the line given as argument
-
-	--endlineno       	(-j): show results before the line given as argument
+Text at the bottom of help
 
 
 
@@ -148,49 +123,85 @@ No third party packets used in this project.
 <!-- HOWTO -->
 <h2 id="how-to-use"> How to Use</h2>
 
-1. First, you need to compile the program
-> make clean all
-2. Then, you may use the executable application on "test.log" sample file like below
-> ./egrep --logfilepath test.log --keywords test1 --seperator " " --elementat 2 --minthres 200 --select 0 --from 5 --drawgraph ./
+1. Install an additional library for graph drawing
+> pip install matplotlib
+> pip install pytest
+2. Then, you may use the executable on "test.txt" sample file like below
+> python3 egrep.py -f test.txt --keywords RX,errors --notkeysensitive --elementat 2 --typeint --drawgraph
 
 The above command's menaning is;
-* use "test.log" as the input log file
-* first, extract the lines includes "test1" keyword. (PS. more keywords canbe used here by seperating them with comma)
-* seperate the selected lines with " " (empty space). (PS. if seperator is not specified, TAB character is used by default)
-* after seperation, second word (starting from index 1) is the data that we interested
-* since we know it is a numeric type, we added minimum threshold. It means, the data greater than 200 are in our scope now
-* also, we want to take 0. index in each 5 lines. This gives us a ability to remove duplicates (it is not necessary in our example)
-* and lastly, we want to see these extracted data on a graph and we gave folder path for the graph to be saved.
+* use "test.txt" as the input log file
+* first, extract the lines includes "RX and errors" keywords. (PS. more keywords canbe used here by seperating them with comma)
+* keywords are not key sensitive
+* after seperation, second word (starting from index 0) is the data that we interested
+* since we know it is a numeric type, use "typeint" to draw fraph
+* and "drawgraph" is used to draw graph
 
 Here is the output of the execution;
 
-    201  
-    206  
-    211  
-    216  
-    221  
-    226  
-    231  
-    236  
-    241  
-    246  
-    251  
-    256  
-    261  
-    266  
-    271  
-    276  
-    281  
-    286  
-    291  
-    296  
-    
-    **********************************************************
-    TOTAL PROGRESSED LINES: 300
-    TOTAL EXTRACTED LINES: 300
-    TOTAL SHOWED LINES: 60
-    
-    **********************************************************
+    1
+    2
+    3
+    4
+    5
+    6
+    7
+    8
+    9
+    10
+    11
+    12
+    13
+    14
+    15
+    16
+    17
+    18
+    19
+    20
+    21
+    22
+    23
+    24
+    25
+    26
+    27
+    28
+    29
+    30
+    40
+    50
+    60
+    70
+    80
+    90
+    80
+    70
+    60
+    50
+    40
+    30
+    10
+    20
+    10
+    10
+    10
+    10
+    10
+    10
+    10
+    20
+    10
+    50
+    20
+    20
+    20
+    20
+    20
+    100
+    ############## SUMMARY ############
+        total processed line    516
+        total found line        60
 
 Note that, we can use ">>" to save the output to a file.
 
@@ -205,10 +216,8 @@ Here is the output graph view;
 <!-- LIMITS -->
 <h2 id="limitations"> Limitations</h2>
 
-All limitations are numeric and can be modified in "main.h" file.
-
 * PIXEL_WIDTH:      Used to determine one graph column's width
-* EMPTY_WIDTH:		Used to determine empty pixels between each graph column
+* EMPTY_WIDTH:        Used to determine empty pixels between each graph column
 * IMAGE_HEIGHT:     Used to limit image height
 * IMAGE_MAX_WIDTH:  Used to limit image width
 * ONE_LINE_MAX_LEN: Used to limit one line lenght in the log file
