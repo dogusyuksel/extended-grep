@@ -39,8 +39,8 @@ jobs:
 
     - name: Flake8 Check
       run: |
-         ./run_docker.sh "run_flake8.sh"
+         ./run_docker.sh "./run_flake8.sh"
 
     - name: Pytest Check
       run: |
-         ./run_docker.sh "run_pytest.sh"
+         ./run_docker.sh "./run_pytest.sh"
