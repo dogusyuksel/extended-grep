@@ -33,8 +33,8 @@ RUN python3 -m pip install flake8
 
 RUN cd /
 RUN git clone git://git.openembedded.org/bitbake
-RUN echo 'export PYTHONPATH="/bitbake/lib:$PYTHONPATH"' >> ~/.bashrc
-RUN echo 'export PATH="/bitbake/bin:$PATH"' >> ~/.bashrc
+ENV PATH="${PATH}:/bitbake/bin"
+ENV PYTHONPATH="${PYTHONPATH}:/bitbake/lib"
 RUN pip install -r bitbake/toaster-requirements.txt
 
 CMD ["/bin/bash"]
